@@ -1,13 +1,13 @@
 ---
 slug: artist-ui-plugin
-status: pursue-with-changes
+status: architected
 verdict: pursue-with-changes
 confidence: medium
 depth: standard
 isolation: isolated
 created: 2026-10-25
 updated: 2026-10-25
-related: [../Craftsman/craftsman/docs/ideas/plugin-overhaul.md (Slice E), ../Craftsman/craftsman/agents/ui-ux-reviewer.md, ../Craftsman/craftsman/skills/design-review/SKILL.md, ../Craftsman/craftsman/scripts/agent-mode-guard.mjs]
+related: [docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md, ../Craftsman/craftsman/docs/ideas/plugin-overhaul.md (Slice E), ../Craftsman/craftsman/agents/ui-ux-reviewer.md, ../Craftsman/craftsman/skills/design-review/SKILL.md, ../Craftsman/craftsman/scripts/agent-mode-guard.mjs]
 touches: [.claude-plugin/plugin.json, .mcp.json, skills/**, commands/**, README.md, evals/**, docs/design/DESIGN.md (format, in target projects), ../Craftsman/craftsman/commands/_shared-execution.md (ui gate target, later), ../Craftsman/craftsman/craftsman.config.json (execution.builtinAgents, later), ../Craftsman/craftsman/EXTENDING.md, ../Craftsman/craftsman/docs/ideas/plugin-overhaul.md (retarget Slice E)]
 ---
 
@@ -216,7 +216,11 @@ should match (markdown skills, Node only if a helper script is needed).
 - craftsman integration? → **Small seam in craftsman** (owner). Applied: rec. 7,
   config-level and sequenced after v1.
 - Workspace manifest linking Artist and craftsman? → **Yes** (owner), after this doc.
-- Still open: which real frontend project hosts the spike, and when?
+- Spike result → owner ran `frontend-design` + Playwright together: "decent
+  results", wants "great" (2026-10-25). The gap is quality, not capability, so v1
+  must add what those two lack: a project design system, a render → critique →
+  refine loop against a scored rubric at several breakpoints, and measured a11y
+  and CWV. Kill criterion 1 is not met; proceed to `/architect`.
 
 ## Next step
 `/architect artist-ui-plugin --deep` (cross-plugin seam with craftsman), after the
