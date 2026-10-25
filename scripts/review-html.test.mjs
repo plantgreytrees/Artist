@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, copyFileSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,6 +54,24 @@ test("reuse findings listed with state", () => {
   for (const s of ["FancyCard", "no existing card fits", "SplitLayout", "#123456", "recharts", "chart.js", "unjustified"])
     assert.ok(html.includes(s), s);
   assert.match(html, /\bjustified\b/);
+});
+
+test("reuse findings render spacing, motion, reduced motion, stale and near-duplicate categories escaped", () => {
+  const { b } = setup(true);
+  const html = renderReview({ rounds: [{ runDir: b, report: rep() }], outDir: b });
+  for (const h of ["Raw spacing", "Raw motion", "Missing reduced motion", "Stale inventory", "Near-duplicates"])
+    assert.ok(html.includes(`<h3>${h}</h3>`), h);
+  for (const s of ["13px", "0.42s", "src/FadeIn.tsx", "OldBanner", "PriceCard", "PricingCard"]) assert.ok(html.includes(s), s);
+  assert.ok(!html.includes("<b>x</b>"));
+  assert.ok(html.includes("&lt;b&gt;x&lt;/b&gt;"));
+});
+
+test("a schema 1 reuse.json without the new categories still renders", () => {
+  const { b } = setup(false);
+  writeFileSync(join(b, "reuse.json"), JSON.stringify({ schema: 1, new_components: [], unjustified: 0 }));
+  const html = renderReview({ rounds: [{ runDir: b, report: rep() }], outDir: b });
+  assert.ok(html.includes("Reuse findings"));
+  assert.ok(!html.includes("Stale inventory"));
 });
 
 const good = () => ({ schema: 1, url: "http://localhost:3000/", generated_at: "2026-10-25T00:00:00Z", breakpoints: [375],

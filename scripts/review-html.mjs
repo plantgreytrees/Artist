@@ -39,8 +39,8 @@ function rubric(r, n) {
 function reuseSection(reuse) {
   if (!reuse) return "";
   if (reuse.unreadable) return `<section><h2>Reuse findings</h2><p class="warn">reuse.json unreadable: rerun reuse-check.</p></section>`;
-  const groups = [["New components", "new_components"], ["New layouts", "new_layouts"], ["Raw colours", "raw_colours"], ["New packages", "new_packages"]];
-  const rows = groups.map(([t, k]) => {
+  const groups = [["New components", "new_components"], ["New layouts", "new_layouts"], ["Raw colours", "raw_colours"], ["Raw spacing", "raw_spacing"], ["Raw motion", "raw_motion"], ["Missing reduced motion", "missing_reduced_motion"], ["New packages", "new_packages"], ["Stale inventory", "stale_inventory"], ["Near-duplicates", "near_duplicates"]];
+  const rows = groups.filter(([, k]) => reuse[k] !== undefined || !["stale_inventory", "near_duplicates"].includes(k)).map(([t, k]) => {
     const items = reuse[k] || [];
     const li = items.map((it) => `<li class="${it.justified ? "ok" : "bad"}"><code>${esc(it.name ?? it.value)}</code> <small>${esc(it.file)}:${esc(it.line)}</small> <strong>${it.justified ? "justified" : "unjustified"}</strong>${it.reason ? ` - ${esc(it.reason)}` : ""}${it.duplicates ? ` <em>duplicates: ${esc([].concat(it.duplicates).join(", "))}</em>` : ""}</li>`).join("");
     return `<h3>${t}</h3>${items.length ? `<ul>${li}</ul>` : "<p>None.</p>"}`;

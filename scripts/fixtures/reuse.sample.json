@@ -1,6 +1,11 @@
-{"schema":1,
+{"schema":2,
 "new_components":[{"name":"FancyCard","file":"src/FancyCard.tsx","line":1,"justified":true,"reason":"no existing card fits"}],
 "new_layouts":[{"name":"SplitLayout","file":"src/SplitLayout.tsx","line":1,"justified":false}],
 "raw_colours":[{"value":"#123456","file":"src/a.css","line":4,"justified":false}],
+"raw_spacing":[{"value":"13px","file":"src/spacing.css","line":2,"justified":false}],
+"raw_motion":[{"value":"0.42s","file":"src/motion.css","line":3,"justified":false}],
+"missing_reduced_motion":[{"name":"src/FadeIn.tsx","file":"src/FadeIn.tsx","line":5,"justified":false}],
 "new_packages":[{"name":"recharts","file":"package.json","line":9,"justified":false,"duplicates":"chart.js"}],
-"unjustified":3}
+"stale_inventory":[{"name":"OldBanner","file":"src/components/OldBanner.tsx","line":1,"justified":false}],
+"near_duplicates":[{"name":"PriceCard","file":"src/components/PriceCard.tsx","line":1,"justified":false,"duplicates":["PricingCard","<b>x</b>"]}],
+"unjustified":8}
