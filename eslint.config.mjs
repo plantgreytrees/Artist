@@ -15,13 +15,7 @@ const browser = {
 
 export default [
   {
-    ignores: [
-      "**/node_modules/**",
-      "scripts/fixtures/**",
-      "evals/results/**",
-      ".artist/**",
-      ".craftsman/**",
-    ],
+    ignores: ["**/node_modules/**", "scripts/fixtures/**", "evals/results/**", ".artist/**", ".craftsman/**"],
   },
   {
     files: ["**/*.{js,mjs,cjs}"],
@@ -33,10 +27,7 @@ export default [
     },
     rules: {
       "no-undef": "error",
-      "no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_", caughtErrors: "none" },
-      ],
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", caughtErrors: "none" }],
       "no-dupe-keys": "error",
       "no-duplicate-case": "error",
       "no-unreachable": "error",
