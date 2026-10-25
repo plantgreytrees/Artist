@@ -36,10 +36,10 @@ Reuse first: existing components, layouts, colours and installed npm packages co
 
 ## Craftsman setup
 
-Artist works without craftsman. If you use craftsman, add the design critic to its config:
+Artist works without craftsman. If you use craftsman, add the design critic to its config, keeping `Explore` in the list:
 
 ```json
-{ "execution": { "builtinAgents": ["artist:design-critic"] } }
+{ "execution": { "builtinAgents": ["Explore", "artist:design-critic"] } }
 ```
 
 ## Opt-in integrations
