@@ -1,0 +1,4 @@
+{"schema":1,"url":"http://localhost:3000/","generated_at":"2026-10-25T10:00:00.000Z","breakpoints":[375,768],
+"axe":{"critical":0,"serious":1,"moderate":0,"minor":0,"violations":[{"id":"image-alt","impact":"serious","help":"Images must have <script>alert(1)</script> alt text","nodes":2,"breakpoints":[375,768]}]},
+"cwv":{"lcp_ms":1800,"cls":0.02,"runs":3,"spread":0.3,"unstable":true},
+"screenshots":{"375":"375.png","768":"768.png"}}
