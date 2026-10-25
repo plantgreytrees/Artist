@@ -98,7 +98,7 @@ test("animation without a reduced-motion fallback is flagged", () => {
 });
 
 const fixtureInventory = () => JSON.parse(read("docs/design/inventory.json"));
-const pricingCard = { path: "src/components/PricingCard.tsx", content: "type PricingCardProps = { price: string };\nexport function PricingCard({ price }: PricingCardProps) { return <div>{price}</div>; }\n" };
+const pricingCard = { path: "src/components/PricingCard.tsx", content: "type PricingCardProps = { price: string; period: string };\nexport function PricingCard({ price, period }: PricingCardProps) { return <div>{price}/{period}</div>; }\n" };
 const allFiles = () => [...[...changed, "src/components/Button.tsx", "src/components/FadeIn.tsx", "src/styles/tokens.css"].map((path) => ({ path, content: read(path) })), pricingCard];
 
 test("--all adds stale inventory and near-duplicates; default mode does not", () => {
@@ -358,4 +358,14 @@ test("S6: Unparsed rows are not read as packages", () => {
   const md = "---\nformat: 2\n---\n## Packages\n| package | version | capability |\n|---|---|---|\n| lucide-react | 1 | icons |\n\n## Unparsed\n| path | reason |\n|---|---|\n| d3 | invalid JSON |\n";
   const r = checkReuse({ designMd: md, files: [{ path: "package.json", content: '{"dependencies":{"recharts":"1"}}' }] });
   assert.equal(r.new_packages[0].duplicates, undefined);
+});
+
+test("thin wrappers sharing only children are not near-duplicates", () => {
+  const designMd = readFileSync(join(here, "fixtures/reuse/DESIGN.md"), "utf8");
+  const files = [
+    { path: "src/components/Card.tsx", content: "type CardProps = { children: React.ReactNode };\nexport function Card({ children }: CardProps) { return <div>{children}</div>; }\n" },
+    { path: "src/components/Panel.tsx", content: "type PanelProps = { children: React.ReactNode };\nexport function Panel({ children }: PanelProps) { return <section>{children}</section>; }\n" },
+  ];
+  const r = checkReuse({ designMd, files, all: true, inventory: { components: [], layouts: [], schemas: [] } });
+  assert.deepEqual(r.near_duplicates, []);
 });
