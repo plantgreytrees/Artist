@@ -1,13 +1,13 @@
 ---
 slug: design-doc-uniformity
-status: pursue-with-changes
+status: architected
 verdict: pursue-with-changes
 confidence: medium
 depth: standard
 isolation: isolated
 created: 2026-10-25
 updated: 2026-10-25
-related: [docs/ideas/artist-ui-plugin.md, docs/plans/artist-ui-plugin.md, docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
+related: [docs/ideas/artist-ui-plugin.md, docs/plans/artist-ui-plugin.md, docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md, docs/architecture/plugin.md, docs/architecture/verify.md]
 touches: [skills/design-system/SKILL.md, skills/design-system/references/design-template.md, skills/create/SKILL.md, skills/create/references/web.md, skills/create/references/mobile.md, skills/optimise/SKILL.md, scripts/design-doc.mjs, scripts/design-doc.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/fixtures/**, evals/design-system/**, README.md, CHANGELOG.md, docs/architecture/plugin.rules.md, docs/architecture/plugin.md, docs/architecture/verify.rules.md, docs/architecture/verify.md]
 ---
 

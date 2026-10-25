@@ -3,7 +3,7 @@
 > and `/architect --update verify` should be run.
 
 # Verify architecture
-_Last verified: 2026-10-25 at `38431ca` · Source idea: [artist-ui-plugin](../ideas/artist-ui-plugin.md)_
+_Last verified: 2026-10-25 at `88d9255` · Source ideas: [artist-ui-plugin](../ideas/artist-ui-plugin.md), [design-doc-uniformity](../ideas/design-doc-uniformity.md)_
 
 ## In plain English
 `scripts/verify.mjs` is the one place artist's numbers come from. Given a local
@@ -68,3 +68,30 @@ be gitignored in target projects (the `design-system init` skill offers to add i
 | ARCH-VERIFY-16 | inventory.mjs writes docs/design/inventory.json (components with props, variants, tokens used, usage, status; layouts with routes; zod/yup/JSON Schema/TS schemas; packages) and regenerates DESIGN.md's marked sections | deep, current knowledge of what exists, readable in DESIGN.md and exact in JSON | hand-maintained tables |
 
 **Known limit:** prop and schema extraction is static (regex and light parsing, no TypeScript compiler), so unusual patterns may be missed; the inventory marks what it could not parse.
+
+## Amendment 2026-10-25: uniformity ratios, token resolution, design-doc renderer
+Source: [design-doc-uniformity](../ideas/design-doc-uniformity.md).
+
+```mermaid
+flowchart LR
+  MD[scripts/design-md.mjs<br/>tables by header name] --> INV[inventory.mjs]
+  MD --> RC[reuse-check.mjs]
+  MD --> DD[design-doc.mjs]
+  TR[scripts/token-refs.mjs<br/>class/key → --variable] --> INV
+  TR --> RC
+  RC --> RJ[(reuse.json schema 3 + ratios)]
+  RJ --> DD --> HTML[(design-system.html)]
+```
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-VERIFY-17 (supersedes 01) | Page scores come from verify.mjs; consistency findings and ratios come from reuse-check.mjs; skills never compute numbers | keeps every number reproducible by a script, now that audit reports ratios | ratios labelled "counts" outside the rule; skill-computed figures |
+| ARCH-VERIFY-18 (supersedes 15) | reuse.json schema 3 adds per-category `{conforming, justified, unjustified, total}` counted per site, `component_token_literals[]` and advisory `off_token_classes[]`; a justification never makes an item conforming | per-site matches how findings are reported (`file:line`); off-token Tailwind classes inform without breaking existing create loops | additive under schema 2; per-file counting; blocking default-palette classes |
+| ARCH-VERIFY-19 (supersedes 16) | tokensUsed also resolves Tailwind classes by namespace from the Semantic tokens `variable` column and RN theme keys by exact token name; config is never executed | today a Tailwind `bg-brand` button records no token use (`inventory.mjs:164`); v4 maps `--color-brand` to `bg-brand` by definition | importing `tailwind.config.js`; counting any `theme.*` chain |
+| ARCH-VERIFY-20 | design-doc.mjs is deterministic, self-contained, escapes everything, allowlists swatch values, embeds an input hash and supports `--check`; it validates Decisions ids | committed file must not churn or carry stored XSS; audit can flag a stale doc | `generated_at` timestamp; JS-applied swatches |
+
+**Shared helpers:** `design-md.mjs` (one DESIGN.md parser, by header name, which also fixes the fixture-vs-template Themes header mismatch) and `token-refs.mjs` (pure resolver with its own tests).
+
+**Known limits:**
+- Site counting is regex-based, so CSS-in-JS, Vue/Svelte SFCs and vendored CSS can be miscounted. Every ratio reports `total`, so readers can sanity-check it.
+- A v3 config using `require()`d themes or closures is beyond the static parse.

@@ -3,7 +3,7 @@
 > and `/architect --update plugin` should be run.
 
 # Plugin architecture
-_Last verified: 2026-10-25 at `38431ca` · Source idea: [artist-ui-plugin](../ideas/artist-ui-plugin.md)_
+_Last verified: 2026-10-25 at `88d9255` · Source ideas: [artist-ui-plugin](../ideas/artist-ui-plugin.md), [design-doc-uniformity](../ideas/design-doc-uniformity.md)_
 
 ## In plain English
 Artist is a Claude Code plugin that designs, builds and polishes UI for web
@@ -127,3 +127,42 @@ flowchart LR
 | ARCH-PLUGIN-28 | Animated components use motion tokens and a reduced-motion fallback | animation is a design decision and an accessibility requirement | guidance only; video capture of motion |
 
 **Trade-off:** strict literal checks will flag existing code on the first `audit`. That is the point of the consistency report, and each item can be fixed or justified.
+
+## Amendment 2026-10-25: design doc, decisions, variables-first, uniformity ratios
+Source: [design-doc-uniformity](../ideas/design-doc-uniformity.md). The owner asked for a browsable design doc of every UI decision, a record of *why* each choice was made, a token model where one variable change restyles the whole product (Tailwind's single-source `@theme` plus Bootstrap's per-component variables, as patterns, not dependencies), and a measure of how uniform the UI is.
+
+```mermaid
+flowchart LR
+  DS[skills/design-system] -->|1 init/audit| INV[scripts/inventory.mjs]
+  DS -->|2 audit| RC[scripts/reuse-check.mjs --all]
+  DS -->|3 init/audit| DD[scripts/design-doc.mjs]
+  INV --> IJ[(inventory.json)]
+  RC --> RJ[(.artist/audit/reuse.json schema 3)]
+  RJ --> CM[(consistency.md: findings + ratios)]
+  DM[(DESIGN.md + Component tokens + Decisions)] --> DD
+  IJ --> DD
+  RJ -->|--reuse| DD
+  DD --> HTML[(docs/design/design-system.html)]
+  DS -. proposes diff, user accepts .-> TF[(tokens.css / @theme / --bs-*)]
+```
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-PLUGIN-29 (supersedes 25) | DESIGN.md stays format 2 and gains two optional sections: Component tokens (Bootstrap-style, only for components with variants or brand overrides, each aliasing a semantic token) and Decisions (`id, decision, why, date, supersedes`). On-scale Tailwind v4 spacing multiples count as token use; breakpoints remain literal | additive, so no project has to re-run init; restyle one component without touching others; rationale stops "fixes" to deliberate choices | format 3 (forces every project through the rerun path); a component token for every component (variable bloat); only named spacing tokens conform (nearly every Tailwind project fails) |
+| ARCH-PLUGIN-30 (supersedes 27) | init and audit also regenerate the HTML doc; audit's consistency.md shows a four-number ratio per category beside the findings | the team doc can't drift silently; counts mean something only with a denominator | HTML on demand only; counts without totals |
+| ARCH-PLUGIN-31 | Only design-system (via design-doc.mjs) writes the committed `docs/design/design-system.html`; no live-tweak panel yet | same single-writer rule as DESIGN.md; a JS-free page has the smallest injection surface | gitignored `.artist/design/` output; live-tweak panel in slice 1 |
+| ARCH-PLUGIN-32 | init proposes token-file diffs (incl. a v3 `var()` migration from a static parse) and applies them only on acceptance; nothing ever executes project config | owner wants variables everywhere without the plugin silently editing code; executing `tailwind.config.js` would run untrusted code | init owns and regenerates token files; document only |
+| ARCH-PLUGIN-33 | Decisions proposed by init with evidence, confirmed by the user, append-only via `supersedes`; deprecations worded `Deprecate <Name>` | ADR-style history; inventory's existing deprecation scan reads these rows, so the wording makes it intentional | human-written only; excluding Decisions from the deprecation scan |
+| ARCH-PLUGIN-34 | Ratios never gate `create`, never reach the critic, never blend into one score; justified ≠ conforming | Goodhart: a single gameable number distorts the loop | one 0–100 score; ratios as a stop criterion |
+
+**Trade-offs:**
+- Tailwind v3 projects whose config holds literal colours score low until they accept init's proposed `var()` migration.
+- The committed HTML changes whenever the inventory changes. That is by design, because it is deterministic and has no timestamp churn.
+- Whether teammates actually open the HTML is unproven. If nobody uses it within a month, stop committing it (the idea's kill criterion).
+
+**Rollout:** three slices, each revertible on its own:
+1. HTML doc + Decisions.
+2. Token resolver, Component tokens and init's proposal step. A half-day spike on the v3 static parse comes first.
+3. Ratios and `reuse.json` schema 3.
+
+The plugin version goes to 0.2.0.
