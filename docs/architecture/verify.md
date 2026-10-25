@@ -42,7 +42,8 @@ flowchart LR
 | ARCH-VERIFY-06 | Output only under `.artist/runs/` | no stray files in source | write beside components |
 | ARCH-VERIFY-07 | 3 runs, median, flag >20% spread | the idea's kill criterion for noisy perf | single run |
 | ARCH-VERIFY-08 | Exit 0/1/2; crash ≠ pass | fail closed | treat crash as skip |
-| ARCH-VERIFY-09/10 | Offline `review.html` with slider, scores, axe, CWV, token diff | owner wants to see every change visually | terminal only; published artifact |
+| ARCH-VERIFY-13/10 | Offline `review.html` with slider, scores, axe, CWV, token diff and reuse findings (13 supersedes 09) | owner wants to see every change visually | terminal only; published artifact |
+| ARCH-VERIFY-12 | Deterministic `reuse-check.mjs` → `reuse.json`; blocks on unjustified new components, layouts, raw colours or dependencies, and marks a new package that duplicates an installed one's capability | owner chose a script check over model judgement, and blocking over advisory | instructions + critic only; advisory |
 | ARCH-VERIFY-11 | Node ESM plus `node --test` | matches craftsman | another runtime |
 
 ## Data & flows

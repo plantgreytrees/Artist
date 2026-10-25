@@ -5,7 +5,7 @@ level: feature
 priority: P1
 idea: docs/ideas/artist-ui-plugin.md
 classification: in-scope (docs/ideas/artist-ui-plugin.md:3 status architected; owner "Please build it", 2026-10-25)
-tracker_rows: [artist-ui-plugin#scaffold, artist-ui-plugin#verify-tests, artist-ui-plugin#verify-impl, artist-ui-plugin#review-html, artist-ui-plugin#skills-core, artist-ui-plugin#skill-create, artist-ui-plugin#evals-readme, artist-ui-plugin#craftsman-seam, artist-ui-plugin#integration]
+tracker_rows: [artist-ui-plugin#scaffold, artist-ui-plugin#verify-tests, artist-ui-plugin#verify-impl, artist-ui-plugin#review-html, artist-ui-plugin#reuse-check, artist-ui-plugin#skills-core, artist-ui-plugin#skill-create, artist-ui-plugin#evals-readme, artist-ui-plugin#craftsman-seam, artist-ui-plugin#integration]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -15,7 +15,7 @@ coverage:
   data:          N/A(no database; files only: .artist/runs/<ts>/ and docs/design/DESIGN.md in target projects)
   config:        1.1, 1.3, 8.3 (plugin.json, .mcp.json flags, craftsman execution.builtinAgents documented)
   security:      2.1, 3.1, 1.3, 5.1, 6.3 (loopback-only URL guard, telemetry off, pinned deps, untrusted-content sentence, read-only critic)
-  tests:         2.1, 2.2, 4.2, 7.1, 8.4, 9.1, 9.2
+  tests:         2.1, 2.2, 4.2, 10.1, 7.1, 8.4, 9.1, 9.2
   observability: 3.1 (report.json is the structured record of every run; cwv.unstable flag)
   interface:     4.1, 5.1-5.3, 6.1 (four skills = CLI surface; review.html = visual surface, offline, keyboard-operable slider)
   docs:          7.2, 8.3, 8.5, 9.3
@@ -70,34 +70,47 @@ units:
     scope:
       read: [scripts/verify.test.mjs]
       docs: [docs/architecture/verify.rules.md]
-      write: [scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/fixtures/report.sample.json]
-    arch: [ARCH-VERIFY-02, ARCH-VERIFY-09, ARCH-VERIFY-10, ARCH-VERIFY-11]
+      write: [scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/fixtures/report.sample.json, scripts/fixtures/reuse.sample.json]
+    arch: [ARCH-VERIFY-02, ARCH-VERIFY-13, ARCH-VERIFY-10, ARCH-VERIFY-11]
     tooling: { implementer: implementer, gates: [ui-ux-reviewer], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 10
+    scope_id: reuse-check
+    project: artist
+    depends_on: [scaffold]
+    module: scripts/reuse-check.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/package.json]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/fixtures/reuse/DESIGN.md, scripts/fixtures/reuse/justifications.json, scripts/fixtures/reuse/src/components/Button.tsx, scripts/fixtures/reuse/src/components/PriceCard.tsx, scripts/fixtures/reuse/src/app/pricing/layout.tsx, scripts/fixtures/reuse/src/app/pricing/page.tsx, scripts/fixtures/reuse/package.json, scripts/fixtures/reuse/package.base.json]
+    arch: [ARCH-VERIFY-12, ARCH-VERIFY-11, ARCH-PLUGIN-22]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
   - id: 5
     scope_id: skills-core
     project: artist
-    depends_on: [verify-impl]
+    depends_on: [verify-impl, reuse-check]
     module: skills/design-system, skills/verify, skills/optimise
     language: markdown
     security: normal
     scope:
-      read: [scripts/verify.mjs]
+      read: [scripts/verify.mjs, scripts/reuse-check.mjs]
       docs: [docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
       write: [skills/design-system/SKILL.md, skills/design-system/references/design-template.md, skills/verify/SKILL.md, skills/optimise/SKILL.md]
-    arch: [ARCH-PLUGIN-07, ARCH-PLUGIN-08, ARCH-PLUGIN-14, ARCH-PLUGIN-15, ARCH-PLUGIN-17, ARCH-PLUGIN-18, ARCH-VERIFY-01]
+    arch: [ARCH-PLUGIN-07, ARCH-PLUGIN-08, ARCH-PLUGIN-14, ARCH-PLUGIN-22, ARCH-PLUGIN-23, ARCH-PLUGIN-17, ARCH-PLUGIN-18, ARCH-VERIFY-01]
     tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
   - id: 6
     scope_id: skill-create
     project: artist
-    depends_on: [verify-impl, review-html]
+    depends_on: [verify-impl, review-html, reuse-check]
     module: skills/create + agents/design-critic
     language: markdown
     security: normal
     scope:
-      read: [scripts/verify.mjs, scripts/review-html.mjs]
+      read: [scripts/verify.mjs, scripts/review-html.mjs, scripts/reuse-check.mjs]
       docs: [docs/architecture/plugin.rules.md]
       write: [skills/create/SKILL.md, skills/create/references/rubric.md, skills/create/references/web.md, skills/create/references/mobile.md, agents/design-critic.md]
-    arch: [ARCH-PLUGIN-07, ARCH-PLUGIN-08, ARCH-PLUGIN-09, ARCH-PLUGIN-10, ARCH-PLUGIN-11, ARCH-PLUGIN-12, ARCH-PLUGIN-13, ARCH-PLUGIN-16, ARCH-PLUGIN-17]
+    arch: [ARCH-PLUGIN-07, ARCH-PLUGIN-08, ARCH-PLUGIN-09, ARCH-PLUGIN-10, ARCH-PLUGIN-11, ARCH-PLUGIN-12, ARCH-PLUGIN-23, ARCH-PLUGIN-24, ARCH-PLUGIN-17]
     tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
   - id: 7
     scope_id: evals-readme
@@ -128,12 +141,12 @@ units:
   - id: 9
     scope_id: integration
     project: artist
-    depends_on: [scaffold, verify-impl, review-html, skills-core, skill-create, evals-readme, craftsman-seam]
+    depends_on: [scaffold, verify-impl, review-html, reuse-check, skills-core, skill-create, evals-readme, craftsman-seam]
     module: whole plugin
     language: mixed
     security: normal
     scope:
-      read: [.claude-plugin/plugin.json, .mcp.json, scripts/verify.mjs, scripts/review-html.mjs]
+      read: [.claude-plugin/plugin.json, .mcp.json, scripts/verify.mjs, scripts/review-html.mjs, scripts/reuse-check.mjs]
       docs: [docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
       write: [CHANGELOG.md]
     arch: [ARCH-PLUGIN-20, ARCH-VERIFY-08]
@@ -236,27 +249,58 @@ Depends on: verify-tests
   - axe counts and top violations
   - CWV: median, spread, unstable flag
   - DESIGN.md token diff, shape `{added:[{name,value}], removed:[name], changed:[{name,from,to}]}`
+  - reuse findings from `reuse.json` when present: new components, layouts and raw colours, each marked justified (with its reason) or unjustified
 
   Scores in `rounds.json` are an object keyed by the 8 rubric dimension names, values 1–5. Use inline CSS and JS, images by relative path, and light/dark via `prefers-color-scheme` → accept: 4.2 passes
 - [ ] 4.2 Write `scripts/review-html.test.mjs` and `scripts/fixtures/report.sample.json`. Check that:
   - the output has every section heading;
   - no `src=`/`href=` value starts with `http`;
   - the slider has a `<label>`;
-  - violation text containing `<script>` is escaped.
+  - violation text containing `<script>` is escaped;
+  - with `scripts/fixtures/reuse.sample.json`, the reuse section lists each item (components, layouts, colours, packages with any `duplicates`) and its justified/unjustified state.
 
   → accept: `node --test scripts/review-html.test.mjs` passes
 
+### Step 10 — reuse-check (artist, node ESM, normal), tests first
+Tooling: implementer · skills test-driven-development
+Depends on: scaffold
+- [ ] 10.1 Write `scripts/reuse-check.test.mjs` and the fixtures under `scripts/fixtures/reuse/`:
+  - `DESIGN.md` (format 1) inventories `Button` (`src/components/Button.tsx`) and the `pricing` layout's parent shell, and has colour tokens `color.brand.primary #1d6b4f` and `color.surface #ffffff`.
+  - `src/components/PriceCard.tsx` is a new component; `src/app/pricing/layout.tsx` is a new layout; `src/app/pricing/page.tsx` uses `Button`, one token colour, one raw `#7b5cff`, and a Tailwind `bg-[#ff0000]`.
+  - DESIGN.md's Packages inventory lists `chart.js` (charts) and `lucide-react` (icons), matching `package.base.json`; `package.json` adds `recharts` (charts) and `date-fns` (dates).
+  - `justifications.json` justifies `PriceCard` ("no existing card component") and `date-fns` ("no date library installed").
+  - Cases:
+    - `PriceCard` and `date-fns` are reported as justified.
+    - The new layout, `#7b5cff`, `#ff0000` and `recharts` are unjustified, and `recharts` carries `duplicates: "chart.js"`.
+    - `#1d6b4f` (a token value, any case) is not reported.
+    - `unjustified` = 4; exit 1. With everything justified → exit 0.
+    - Missing DESIGN.md → exit 2.
+    - Output `reuse.json` has `schema: 1`.
+
+  → accept: tests fail only on the missing `./reuse-check.mjs` import
+- [ ] 10.2 Write `scripts/reuse-check.mjs`, exporting `checkReuse({designMd, files:[{path, content}], justifications})` (pure) plus a CLI: `node scripts/reuse-check.mjs --project <dir> --run <runDir> [--files a,b] [--base <git ref>]`. Changed files come from `--files`, else `git diff --name-only <base>` in the project. Rules:
+  - A component is a new file under a `components/` dir (or exporting a PascalCase component) whose name isn't in the Components inventory.
+  - A layout is a new `layout.*`, `_layout.*` or `*Layout.*` file whose path isn't in the Layouts inventory.
+  - A raw colour is a hex, `rgb(…)`/`hsl(…)` or Tailwind arbitrary `[#…]` literal in a changed file whose normalised value matches no token value.
+  - A new package is a `dependencies`/`devDependencies` entry in any changed package.json that isn't in the Packages inventory. A fixed capability map in the script (charts: chart.js, react-chartjs-2, recharts, echarts, apexcharts, victory, @nivo/*, d3; icons: lucide-react, react-icons, @heroicons/*, @fortawesome/*; ui-kit: @mui/*, antd, @chakra-ui/*, @radix-ui/*, @headlessui/*, @mantine/*; animation: framer-motion, motion, gsap, react-spring; dates: date-fns, dayjs, moment, luxon; forms: react-hook-form, formik; state: zustand, redux, @reduxjs/toolkit, jotai) sets `duplicates` to the installed package covering the same capability.
+  - Writes `reuse.json` into the run folder; exit 0 none unjustified, 1 some, 2 tool error (unreadable DESIGN.md, bad JSON).
+
+  → accept: `node --test scripts/reuse-check.test.mjs` passes
+
 ### Step 5 — skills-core (artist, markdown, normal)
-Depends on: verify-impl
+Depends on: verify-impl, reuse-check
 - [ ] 5.1 Write `skills/design-system/SKILL.md` (`init | audit`):
-  - Derive tokens, type scale, spacing, components and motion from existing code: Tailwind config, CSS variables, theme files, React Native StyleSheets.
+  - Derive tokens (the colour scheme, light and dark), type scale, spacing and motion from existing code: Tailwind config, CSS variables, theme files, React Native StyleSheets.
+  - Inventory existing components and layouts (page shells, `layout.*`, `_layout.*`, `*Layout.*`) with name, path and use.
+  - Inventory every dependency in the project's package.json files (all workspaces) with version and a capability tag for UI-relevant ones (charts, icons, ui-kit, animation, dates, forms, state).
+  - `audit` reports inventory drift in all three.
   - Write `docs/design/DESIGN.md` from `references/design-template.md`. This skill is its sole writer.
   - Apply the token changes that create and optimise propose.
   - Offer to add `.artist/` to `.gitignore`.
   - Include the untrusted-content sentence.
 
   → accept: under 500 lines; one-sentence `description`; the only skill that writes DESIGN.md
-- [ ] 5.2 Write `skills/design-system/references/design-template.md` with frontmatter `format: 1` and sections Tokens, Type scale, Spacing, Components, Motion, Platform notes. Tokens are a markdown table `| name | value | use |` with dotted names (`color.brand.primary`, `space.4`, `radius.card`). Platform notes holds the dev URL and start command (`dev url: http://localhost:3000`, `start: npm run dev`) → accept: all six headings present; the token table header matches
+- [ ] 5.2 Write `skills/design-system/references/design-template.md` with frontmatter `format: 1` and sections Tokens, Type scale, Spacing, Components, Layouts, Packages, Motion, Platform notes. Tokens are a markdown table `| name | value | use |` with dotted names (`color.brand.primary`, `space.4`, `radius.card`); Components and Layouts are tables `| name | path | use |`; Packages is `| package | version | capability |`. These are the formats `reuse-check.mjs` parses. Platform notes holds the dev URL and start command (`dev url: http://localhost:3000`, `start: npm run dev`) → accept: all six headings present; the token table header matches
 - [ ] 5.3 Write `skills/verify/SKILL.md`:
   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/verify.mjs" <url>`, read report.json, and explain each failure.
   - Use the playwright and chrome-devtools MCP tools only to diagnose (trace for LCP/CLS, DOM for axe), never as a source of scores.
@@ -268,7 +312,8 @@ Depends on: verify-impl
 - [ ] 5.4 Write `skills/optimise/SKILL.md`:
   - Scope: measured perf and a11y fixes, plus UI security smells: unsafe HTML sinks (`dangerouslySetInnerHTML`, `v-html`), `target=_blank` without `rel=noopener`, secrets in client code.
   - Re-measure after each fix.
-  - Propose token changes; never edit DESIGN.md.
+  - Fix with existing inventoried components, layouts, colour tokens and installed packages; anything new, including a new dependency, needs a line in `justifications.json`, and `reuse-check.mjs` must report 0 unjustified.
+  - Propose token or inventory changes; never edit DESIGN.md.
   - Defer deep security and dependency review to craftsman's `security-auditor`/`dependency-auditor` when present.
 
   → accept: under 500 lines; scope section present
@@ -279,14 +324,15 @@ Depends on: verify-impl, review-html
   - Read DESIGN.md (run design-system init first if it's missing), plus `references/web.md` or `mobile.md` for the detected stack.
   - Get the URL the same way as the verify skill (user's URL, else DESIGN.md `dev url`; never start the server).
   - Parse the critic's 8 lines (`dimension: score — reason`) into the `rounds.json` scores object; a malformed reply counts as a failed dispatch (NOT ISOLATED fallback).
-  - Loop up to 3 rounds: build or refine → `verify.mjs` → dispatch `artist:design-critic` once, with only the screenshots, report.json, DESIGN.md and the rubric.
-  - Stop when every score ≥ 4, axe serious+critical = 0, LCP ≤ 2500 ms, CLS ≤ 0.1, and CWV is not unstable.
+  - Before writing anything, search the Components, Layouts and Packages inventories and the colour tokens; reuse what fits. Use an installed package when it covers the need (chart.js for a chart, the installed icon set for icons) rather than hand-rolling it or adding another library. Anything new gets a one-line reason in the run's `justifications.json` ("within reason": a reason is enough, and the user's explicit ask for something new counts as one).
+  - Loop up to 3 rounds: build or refine → `verify.mjs` → `reuse-check.mjs` → dispatch `artist:design-critic` once, with only the screenshots, report.json, DESIGN.md and the rubric.
+  - Stop when every score ≥ 4, axe serious+critical = 0, LCP ≤ 2500 ms, CLS ≤ 0.1, CWV is not unstable, and reuse-check reports 0 unjustified.
   - If the dispatch is blocked or fails, run the critic brief in-session and mark the round NOT ISOLATED. Never retry or run critics in parallel.
   - On reaching the cap, list each unmet criterion.
   - Record new one-off values as proposed tokens.
   - Finish by writing `rounds.json` (each round's runDir, scores, critique, isolated flag, plus the token diff) and running `review-html.mjs --rounds`.
 
-  → accept: under 500 lines; the stop condition matches ARCH-PLUGIN-13's numbers
+  → accept: under 500 lines; the stop condition matches ARCH-PLUGIN-24
 - [ ] 6.2 Write `skills/create/references/rubric.md`:
   - Exactly 8 dimensions: Hierarchy, Typography, Spacing & rhythm, Colour & contrast, Distinctiveness, Responsiveness, Accessibility, Motion.
   - Each one describes what a 2, a 4 and a 5 look like.
@@ -310,7 +356,7 @@ Depends on: skills-core, skill-create
 - [ ] 7.2 Write `README.md`, covering:
   - what artist is
   - install: `/plugin marketplace add plantgreytrees/Artist`
-  - the four skills
+  - the four skills, and the reuse rule (existing components, layouts, colours and installed npm packages first; anything new, including a new dependency, needs a justification)
   - the first-run dependency install
   - the craftsman setup line (`"artist:design-critic"` in `execution.builtinAgents`)
   - opt-in snippets for Next DevTools (with `NEXT_TELEMETRY_DISABLED=1`), Expo, Flowbite, GSAP, shadcn, 21st and UI/UX Pro
@@ -334,13 +380,13 @@ Depends on: none
 Depends on: all
 - [ ] 9.1 Run `claude plugin validate --strict .` → accept: `Validation passed`
 - [ ] 9.2 Run `node --test scripts/*.test.mjs` with the browser cases enabled → accept: all pass
-- [ ] 9.3 End to end: serve `scripts/fixtures/` on loopback, run `node scripts/verify.mjs <url> --project <tmp>`, then `node scripts/review-html.mjs <run dir>` → accept: exit 0; `review.html` has every section and no network references
+- [ ] 9.3 End to end: serve `scripts/fixtures/` on loopback, run `node scripts/verify.mjs <url> --project <tmp>`, then `node scripts/reuse-check.mjs --project scripts/fixtures/reuse --run <run dir> --files src/app/pricing/page.tsx` (expect exit 1 with the fixture's raw colours), then `node scripts/review-html.mjs <run dir>` → accept: verify exits 0; `review.html` has every section, including reuse findings, and no network references
 - [ ] 9.4 Write `CHANGELOG.md` with a `## [0.1.0]` section describing the first release, including the rollback note. This task goes last → accept: the file exists with one release section
 
 ## Sequencing
 1. scaffold
 2. verify-tests
-3. verify-impl and review-html, in parallel
+3. verify-impl, review-html and reuse-check, in parallel
 4. skills-core and skill-create, in parallel
 5. evals-readme
 6. integration
