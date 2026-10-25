@@ -5,7 +5,7 @@ level: feature
 parent: artist-ui-plugin
 priority: P1
 classification: in-scope (/scrutinise round 1, isolated scrutineer, range f2a2f4c..e70dd8a; all findings verified at file:line, none disputed)
-tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html]
+tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html, scrutinise-artist-ui-plugin#fix2-scan, scrutinise-artist-ui-plugin#fix2-review-html, scrutinise-artist-ui-plugin#fix2-skills]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -61,6 +61,45 @@ units:
       write: [scripts/review-html.mjs, scripts/review-html.test.mjs]
     arch: [ARCH-VERIFY-13, ARCH-VERIFY-10, ARCH-VERIFY-08]
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 4
+    scope_id: fix2-scan
+    project: "."
+    depends_on: []
+    module: scripts/reuse-check.mjs + scripts/inventory.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/fixtures/audit/DESIGN.md, scripts/fixtures/audit/src/components/Hero.tsx, scripts/fixtures/audit/src/ui/Hero.tsx, scripts/fixtures/audit/src/components/Banner.tsx, scripts/fixtures/audit/src/components/Promo.tsx, scripts/fixtures/audit/src/styles/tokens.css, scripts/fixtures/audit/NOTES.md, scripts/fixtures/audit/public/logo.svg]
+    arch: [ARCH-VERIFY-15, ARCH-VERIFY-16, ARCH-VERIFY-11, ARCH-PLUGIN-27]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 5
+    scope_id: fix2-review-html
+    project: "."
+    depends_on: []
+    module: scripts/review-html.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/verify.mjs]
+      docs: [docs/architecture/verify.rules.md]
+      write: [scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/verify.mjs]
+    arch: [ARCH-VERIFY-13, ARCH-VERIFY-08, ARCH-PLUGIN-24]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 6
+    scope_id: fix2-skills
+    project: "."
+    depends_on: [fix2-scan]
+    module: skills/create + skills/optimise
+    language: markdown
+    security: normal
+    scope:
+      read: [skills/create/SKILL.md, skills/optimise/SKILL.md, scripts/reuse-check.mjs]
+      docs: [docs/architecture/plugin.rules.md]
+      write: [skills/create/SKILL.md, skills/optimise/SKILL.md]
+    arch: [ARCH-PLUGIN-26, ARCH-PLUGIN-08]
+    tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
 ---
 
 # Plan: Fix the first review's findings in artist
@@ -105,6 +144,48 @@ Depends on: fix-verify
   - Render `axe.violations[].targets` when present.
 
   → accept: `node --test scripts/review-html.test.mjs` passes; full suite green
+
+## Round 2 (scrutineer range e70dd8a..43fa780: 0 Critical, 5 Warning, 4 Suggestion)
+
+### Step 4 — fix2-scan (node ESM)
+Tooling: implementer · skills test-driven-development
+- [ ] 4.1 Tests first. Add fixture `scripts/fixtures/audit/`:
+  - a format-2 `DESIGN.md` naming `src/styles/tokens.css` as the token file
+  - the same `Hero` at `src/components/Hero.tsx` and `src/ui/Hero.tsx`
+  - `Banner.tsx` and `Promo.tsx` with identical prop names
+  - `NOTES.md` containing "fixes #123" and `13px`
+  - `public/logo.svg` with `fill="#ff0000"`
+
+  Each test copies the fixture into a temp git repo and commits it. Cases:
+  - **W1:** run `inventory.mjs`, then `reuse-check --all` → `near_duplicates` includes Hero (same name) and Banner/Promo (prop overlap).
+  - **W1:** an inventory entry whose file was then deleted → `stale_inventory`; a fresh inventory → no stale entries.
+  - **W3:** a tracked file deleted without staging → `--all` still exits by result, not 2.
+  - **W4:** `NOTES.md`, `logo.svg` and a written `docs/design/consistency.md` produce no findings.
+  - **W5:** a git-ignored `dist/Foo.tsx` (created at runtime, ignored via `.gitignore`) is neither inventoried nor flagged.
+  - **S6:** the Unparsed table never appears as package rows.
+
+  → accept: the new cases fail first
+- [ ] 4.2 Implement:
+  - Export one `listProjectFiles(project)` from `scripts/inventory.mjs`: `git ls-files --cached --others --exclude-standard` inside a repo (existing regular files only), filesystem walk outside git, always skipping `node_modules/`, `.artist/`, `.git/`, `.worktrees/`. Both scripts use it.
+  - Near-duplicates are computed pairwise over current components. Stale entries are inventory paths missing from the file list.
+  - The colour, spacing and motion scans cover only code and style extensions (`.js .jsx .ts .tsx .mjs .cjs .css .scss .sass .less .vue .svelte .html`) and always exclude `docs/design/**`.
+  - Unparsed is rendered as `## Unparsed`.
+  - `CAPS`, `capOf` and `formatOf` are exported once from `inventory.mjs` and imported by `reuse-check.mjs`.
+
+  → accept: `node --test scripts/reuse-check.test.mjs scripts/inventory.test.mjs` passes; full suite green
+
+### Step 5 — fix2-review-html (node ESM)
+Tooling: implementer · skills test-driven-development
+- [ ] 5.1 **W2:** first a failing test: a report with `cwv.lcp_ms: null`, all scores 5 and axe 0 renders NEEDS WORK. Then export `cwvPasses(cwv)` from `scripts/verify.mjs` (used by `exitCodeFor`) and use it in `review-html.mjs`'s `passes()` → accept: test fails first, then passes; full suite green
+
+### Step 6 — fix2-skills (markdown)
+Depends on: fix2-scan
+- [ ] 6.1 **S8:** in `skills/create/SKILL.md` and `skills/optimise/SKILL.md`, list every valid justification key:
+  - component, layout or package name
+  - colour, spacing or motion value as reported (for example `13px`, `cubic-bezier(...)`)
+  - file path for `missing_reduced_motion`
+
+  → accept: both files name all of them
 
 ## Sequencing
 fix-reuse-check and fix-verify are independent; fix-review-html follows fix-verify because it imports `THRESHOLDS` and renders `targets`.
