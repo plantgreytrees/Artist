@@ -51,7 +51,7 @@ test("layout, raw colours and recharts are unjustified", () => {
     false,
   );
   assert.equal(r.unjustified, 6);
-  assert.equal(r.schema, 2);
+  assert.equal(r.schema, 3);
 });
 
 test("a colour equal to a token value is reported outside token files (strict)", () => {
@@ -199,7 +199,7 @@ test("CLI --all scans every file and writes schema 2 with the new categories", (
   const { res, out } = runCli(join(here, "reuse-check.mjs"), p, ["--all"]);
   assert.equal(res.status, 1, res.stderr);
   const j = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
-  assert.equal(j.schema, 2);
+  assert.equal(j.schema, 3);
   assert.ok(j.raw_colours.some((x) => x.value === "#abcdef"));
   assert.equal(
     j.raw_colours.some((x) => x.value === "#999999"),
@@ -224,7 +224,7 @@ test("CLI exits 1 and writes reuse.json with schema 2", () => {
   const { res, out } = cli(fx, ["--justifications", join(fx, "justifications.json")]);
   assert.equal(res.status, 1, res.stderr);
   const j = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
-  assert.equal(j.schema, 2);
+  assert.equal(j.schema, 3);
   assert.equal(j.unjustified, 6);
 });
 
@@ -548,4 +548,152 @@ test("a Nuxt layouts/*.vue file missing from DESIGN.md is a new layout", () => {
     r.new_layouts.map((x) => x.name),
     ["layouts/marketing.vue"],
   );
+});
+
+// ---- schema 3: ratios (ARCH-VERIFY-22) ----
+const R_KEYS = ["ratios", "component_token_literals", "off_token_classes", "prop_synonyms"];
+const CAT = ["colours", "spacing", "motion", "reduced_motion", "component_tokens", "component_api"];
+const noInv = { components: [], layouts: [], schemas: [] };
+const withSection = (extra) => designMd.replace("\n## Platform notes", `\n${extra}\n## Platform notes`);
+const btn = (name, size, extra = "") =>
+  `type ${name}Props = { size: ${size.map((s) => `"${s}"`).join(" | ")}; ${extra} };\nexport function ${name}({ size }: ${name}Props) { return <b className="bg-action" />; }\n`;
+const comp = (name, content) => ({ path: `src/components/${name}.tsx`, content });
+const all = (files, md = designMd, justs = {}) =>
+  checkReuse({ designMd: md, files, justifications: justs, all: true, inventory: noInv });
+const sumOk = (r) => {
+  for (const k of CAT) {
+    const x = r.ratios[k];
+    assert.deepEqual(Object.keys(x), ["conforming", "justified", "unjustified", "total"], k);
+    assert.equal(x.conforming + x.justified + x.unjustified, x.total, k);
+  }
+};
+
+test("schema 3: default mode has none of the --all keys", () => {
+  const r = one("src/a.tsx", "const a = 1;");
+  assert.equal(r.schema, 3);
+  for (const k of R_KEYS) assert.equal(Object.hasOwn(r, k), false, k);
+  assert.equal(Object.hasOwn(all([]), "ratios"), true);
+});
+
+test("--all ratios: sum invariant per category; justification never makes an item conforming", () => {
+  const files = [
+    {
+      path: "src/a.tsx",
+      content:
+        'const a = { color: "var(--color-action-primary)", padding: "13px", transition: "opacity 150ms var(--motion-fast)" };\nconst b = "#ff0000";\nconst c = "p-2";',
+    },
+    { path: "src/b.css", content: ".x{ color:#00ff00; animation: spin 2s linear infinite }" },
+    {
+      path: "src/c.css",
+      content: ".y{ animation: spin 1s; } @media (prefers-reduced-motion: reduce){ .y{animation:none} }",
+    },
+  ];
+  const plain = all(files);
+  sumOk(plain);
+  assert.equal(plain.ratios.colours.conforming, 1);
+  assert.equal(plain.ratios.colours.unjustified, 2);
+  assert.equal(plain.ratios.spacing.conforming, 1); // p-2 = 2 x 4px lands on space.2
+  assert.equal(plain.ratios.spacing.unjustified, 1);
+  assert.equal(plain.ratios.motion.conforming, 1);
+  assert.equal(plain.ratios.reduced_motion.conforming, 1);
+  assert.equal(plain.ratios.reduced_motion.unjustified, 2);
+  const j = all(files, designMd, { "#ff0000": "brand red", "13px": "x", "src/b.css": "decorative" });
+  sumOk(j);
+  assert.equal(j.ratios.colours.conforming, 1);
+  assert.equal(j.ratios.colours.justified, 2); // the file key also justifies b.css colour
+  assert.equal(j.ratios.spacing.conforming, 1);
+  assert.equal(j.ratios.spacing.justified, 1);
+  assert.deepEqual(j.ratios.reduced_motion, { conforming: 1, justified: 1, unjustified: 1, total: 3 });
+});
+
+test("--all: a variant-bearing component without a Component tokens block is unjustified; justifiable by name", () => {
+  const files = [comp("Chip", btn("Chip", ["sm", "lg"]))];
+  const r = all(files);
+  assert.deepEqual(r.ratios.component_tokens, { conforming: 0, justified: 0, unjustified: 1, total: 1 });
+  assert.equal(r.ratios.colours.conforming, 0);
+  const j = all(files, designMd, { Chip: "deliberate" });
+  assert.deepEqual(j.ratios.component_tokens, { conforming: 0, justified: 1, unjustified: 0, total: 1 });
+  const md = withSection(
+    "## Component tokens\n| component | variable | semantic | use |\n|---|---|---|---|\n| Chip | --chip-bg | color.surface | bg |\n",
+  );
+  const ok = all(files, md);
+  assert.deepEqual(ok.ratios.component_tokens, { conforming: 1, justified: 0, unjustified: 0, total: 1 });
+  assert.deepEqual(ok.component_token_literals, []);
+  const plainComp = all([comp("Plain", "export function Plain() { return <i />; }\n")]);
+  assert.equal(plainComp.ratios.component_tokens.total, 0);
+});
+
+test("--all: a literal in a Component tokens cell is a component_token_literal and keeps the component off conforming", () => {
+  const md = withSection(
+    "## Component tokens\n| component | variable | semantic | use |\n|---|---|---|---|\n| Chip | --chip-bg | #ff00ff | bg |\n| Chip | --chip-pad | space.2 | pad |\n",
+  );
+  const files = [comp("Chip", btn("Chip", ["sm", "lg"]))];
+  const r = all(files, md);
+  assert.deepEqual(
+    r.component_token_literals.map((x) => [x.name, x.value, x.justified]),
+    [["Chip.--chip-bg", "#ff00ff", false]],
+  );
+  assert.equal(r.ratios.component_tokens.conforming, 0);
+  assert.equal(r.ratios.component_tokens.unjustified, 1);
+  assert.equal(r.unjustified >= 1, true);
+  const j = all(files, md, { "Chip.--chip-bg": "legacy" });
+  assert.equal(j.component_token_literals[0].justified, true);
+  assert.deepEqual(j.ratios.component_tokens, { conforming: 0, justified: 1, unjustified: 0, total: 1 });
+  sumOk(j);
+});
+
+test("--all component_api: majority value set conforms; tie broken by smallest joined set", () => {
+  const maj = all([
+    comp("A", btn("A", ["sm", "md"])),
+    comp("B", btn("B", ["md", "sm"])),
+    comp("C", btn("C", ["lg", "sm"])),
+  ]);
+  assert.deepEqual(maj.ratios.component_api, { conforming: 2, justified: 0, unjustified: 1, total: 3 });
+  const tie = all([comp("A", btn("A", ["sm", "md"])), comp("B", btn("B", ["lg", "xl"]))]);
+  // "lg,xl" < "md,sm": B conforms, A does not
+  assert.deepEqual(tie.ratios.component_api, { conforming: 1, justified: 0, unjustified: 1, total: 2 });
+  const j = all([comp("A", btn("A", ["sm", "md"])), comp("B", btn("B", ["lg", "xl"]))], designMd, { "A.size": "x" });
+  assert.deepEqual(j.ratios.component_api, { conforming: 1, justified: 1, unjustified: 0, total: 2 });
+  const solo = all([comp("A", btn("A", ["sm", "md"]))]);
+  assert.equal(solo.ratios.component_api.total, 0);
+});
+
+test("--all: <Component>.<prop> justification keys do not collide with new_components", () => {
+  const files = [comp("A", btn("A", ["sm", "md"])), comp("B", btn("B", ["lg", "xl"]))];
+  const r = all(files, designMd, { A: "new component reason" });
+  assert.equal(r.new_components.find((x) => x.name === "A").justified, true);
+  assert.equal(r.ratios.component_api.justified, 0);
+  assert.equal(r.ratios.component_api.unjustified, 1);
+});
+
+test("--all: off_token_classes and prop_synonyms are advisory and uncounted", () => {
+  const files = [
+    comp("A", btn("A", ["sm", "md"]).replace("bg-action", "bg-nothing-here")),
+    comp("B", btn("B", ["sm", "md"]).replace("size", "scale")),
+  ];
+  const r = all(files);
+  assert.ok(r.off_token_classes.some((x) => x.class === "bg-nothing-here" && x.reason === "unknown"));
+  assert.deepEqual(
+    r.prop_synonyms.map((x) => [x.props, x.values]),
+    [
+      [
+        ["scale", "size"],
+        ["md", "sm"],
+      ],
+    ],
+  );
+  const base = all(files.map((f) => ({ ...f, content: f.content.replace("bg-nothing-here", "bg-action") })));
+  assert.equal(r.unjustified, base.unjustified);
+  sumOk(r);
+});
+
+test("--all: docs/design/** is never scanned for ratios and breakpoints are exempt", () => {
+  const r = all([
+    { path: "docs/design/a.css", content: "a{color:#abcdef;padding:13px;animation:x 2s}" },
+    { path: "src/m.css", content: "@media (min-width: 768px){ .a{ color: var(--color-surface) } }" },
+  ]);
+  assert.deepEqual(r.ratios.colours, { conforming: 1, justified: 0, unjustified: 0, total: 1 });
+  assert.equal(r.ratios.spacing.total, 0);
+  assert.equal(r.ratios.reduced_motion.total, 0);
+  assert.deepEqual(r.raw_spacing, []);
 });
