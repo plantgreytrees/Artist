@@ -1,0 +1,6 @@
+node_modules/
+scripts/fixtures/
+evals/results/
+.artist/
+.craftsman/
+*.md

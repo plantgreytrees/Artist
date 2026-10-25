@@ -41,7 +41,10 @@ test("Button: props, variants, tokens, usage, status", () => {
   assert.deepEqual(b.variants, { variant: ["primary", "secondary"] });
   assert.ok(b.tokensUsed.includes("--color-action-primary"));
   assert.equal(b.usage.count, 2);
-  assert.deepEqual(b.usage.files.map((f) => f.replace(/^.*\/app\//, "app/")), ["app/pricing/page.tsx"]);
+  assert.deepEqual(
+    b.usage.files.map((f) => f.replace(/^.*\/app\//, "app/")),
+    ["app/pricing/page.tsx"],
+  );
   assert.equal(b.status, "current");
 });
 
@@ -154,7 +157,13 @@ test("buildInventory is pure and exported", async () => {
 
 test("Unparsed renders as a level-2 section", async () => {
   const { renderSections } = await import("./inventory.mjs");
-  const out = renderSections({ components: [], layouts: [], schemas: [], packages: [], unparsed: [{ path: "a.schema.json", reason: "bad" }] });
+  const out = renderSections({
+    components: [],
+    layouts: [],
+    schemas: [],
+    packages: [],
+    unparsed: [{ path: "a.schema.json", reason: "bad" }],
+  });
   assert.match(out, /^## Unparsed$/m);
   assert.doesNotMatch(out, /^###/m);
 });
