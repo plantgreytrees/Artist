@@ -1,6 +1,7 @@
 {
   "name": "artist-marketplace",
   "owner": { "name": "Kieran" },
+  "description": "Artist: a Claude Code plugin that designs, builds, measures and refines UI against a project design system.",
   "plugins": [
     {
       "name": "artist",
