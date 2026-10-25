@@ -5,7 +5,7 @@ level: feature
 parent: artist-ui-plugin
 priority: P1
 classification: in-scope (/scrutinise round 1, isolated scrutineer, range f2a2f4c..e70dd8a; all findings verified at file:line, none disputed)
-tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html, scrutinise-artist-ui-plugin#fix2-scan, scrutinise-artist-ui-plugin#fix2-review-html, scrutinise-artist-ui-plugin#fix2-skills]
+tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html, scrutinise-artist-ui-plugin#fix2-scan, scrutinise-artist-ui-plugin#fix2-review-html, scrutinise-artist-ui-plugin#fix2-skills, scrutinise-artist-ui-plugin#fix3]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -100,6 +100,19 @@ units:
       write: [skills/create/SKILL.md, skills/optimise/SKILL.md]
     arch: [ARCH-PLUGIN-26, ARCH-PLUGIN-08]
     tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
+  - id: 7
+    scope_id: fix3
+    project: "."
+    depends_on: []
+    module: scripts/inventory.mjs + verify.mjs + reuse-check.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/verify.mjs, scripts/verify.test.mjs, scripts/reuse-check.mjs, scripts/reuse-check.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/verify.mjs, scripts/verify.test.mjs, scripts/reuse-check.mjs, scripts/reuse-check.test.mjs]
+    arch: [ARCH-VERIFY-16, ARCH-VERIFY-15, ARCH-VERIFY-08, ARCH-PLUGIN-24, ARCH-PLUGIN-27]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
 ---
 
 # Plan: Fix the first review's findings in artist
@@ -186,6 +199,15 @@ Depends on: fix2-scan
   - file path for `missing_reduced_motion`
 
   → accept: both files name all of them
+
+## Round 3 (scrutineer range 43fa780..cd93b1b: 0 Critical, 1 Warning, 3 Suggestion)
+
+### Step 7 — fix3 (node ESM)
+Tooling: implementer · skills test-driven-development
+- [ ] 7.1 **W1:** first a failing test: a temp parent repo whose `.gitignore` ignores `app/`, with `app/src/components/X.tsx` → `listProjectFiles("<tmp>/app")` returns the file. Then, in `scripts/inventory.mjs`, fall back to the filesystem walk when `git check-ignore -q .` succeeds in the project, or when git lists zero names but the directory has entries → accept: test fails first, then passes
+- [ ] 7.2 **S2:** first failing tests: `cwvPasses` with `cls: null` and with `cls: NaN` → false. Then require a finite numeric `cls` in `scripts/verify.mjs` → accept: tests fail first, then pass
+- [ ] 7.3 **S3:** first a failing test: two wrapper components each taking only `{ children }` are not near-duplicates, while Banner/Promo still are. Then count prop overlap only when both components have at least 2 props after ignoring `children` and `className`, and build each prop set once before the pairwise loop → accept: test fails first; the full suite is green
+- S4 (`ARCH-VERIFY-15` doesn't name the scanned extensions or the `docs/design/**` exclusion) is a rule-text update for `/sync-docs` → `/architect --update`; it is not part of fix3.
 
 ## Sequencing
 fix-reuse-check and fix-verify are independent; fix-review-html follows fix-verify because it imports `THRESHOLDS` and renders `targets`.
