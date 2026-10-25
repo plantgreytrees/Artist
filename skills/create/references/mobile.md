@@ -11,7 +11,8 @@ Load this for mobile stacks. Reuse first: check the DESIGN.md Components, Layout
 - Respect safe-area insets with `react-native-safe-area-context` (`SafeAreaView` or `useSafeAreaInsets`).
 - Use `Platform.select` for platform differences instead of scattered `Platform.OS` checks.
 - Take spacing, colour and type from DESIGN.md tokens via a shared theme module, not inline literals.
-- Respect reduced motion (`AccessibilityInfo.isReduceMotionEnabled`).
+- Keep one theme object per brand, each with light and dark values for every semantic token; pick the scheme with `useColorScheme` and the brand from the theme provider. Components read semantic keys (`theme.color.action.primary`), never literals.
+- Every animation uses the Motion tokens and respects reduced motion: `AccessibilityInfo.isReduceMotionEnabled`, or reanimated `useReducedMotion`.
 
 ## Verification
 Native screens cannot be measured by `verify.mjs` directly. Choose one:

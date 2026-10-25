@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Design depth and white-label theming: format-2 `DESIGN.md` with a generated component, layout, schema and package inventory, semantic tokens and per-brand light/dark themes; a platform consistency audit (`docs/design/consistency.md`); and motion enforcement (motion tokens and reduced-motion fallbacks) in `create` and `optimise`.
+
 ## [0.1.0] - 2026-10-25
 
 First release of artist, a Claude Code plugin that designs, builds, measures and refines UI until it meets a scored quality bar.
