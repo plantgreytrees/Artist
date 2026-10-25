@@ -18,7 +18,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatOf } from "./design-md.mjs";
+import { formatOf, bindTokens, decisionsOf, spacingBaseOf } from "./design-md.mjs";
+import { resolveClass } from "./token-refs.mjs";
 
 export const START = "<!-- artist:inventory:start -->";
 export const END = "<!-- artist:inventory:end -->";
@@ -128,13 +129,40 @@ function isDeprecated(content, name, designMd) {
   return m || deprecatedInDesign(designMd, name);
 }
 
+// Only an exact `Deprecate <Name>` Decisions row deprecates (ARCH-VERIFY-23).
 function deprecatedInDesign(designMd, name) {
   if (!designMd) return false;
-  const outside =
-    designMd.includes(START) && designMd.includes(END)
-      ? designMd.slice(0, designMd.indexOf(START)) + designMd.slice(designMd.indexOf(END) + END.length)
-      : designMd;
-  return outside.split(/\r?\n/).some((l) => /deprecated/i.test(l) && new RegExp(`\\b${name}\\b`).test(l));
+  return decisionsOf(designMd).some((r) => String(r.decision ?? "").trim() === `Deprecate ${name}`);
+}
+
+// Token context: bound tokens plus the Tailwind spacing base read from token-file text.
+function tokenCtx(designMd, tokenTexts) {
+  return { tokens: bindTokens(designMd || ""), spacingPx: spacingBaseOf(tokenTexts ?? []) };
+}
+
+const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
+
+// Bound variables a source file references: CSS var(), Tailwind v4 utilities, RN member chains.
+function tokensIn(content, ctx) {
+  const out = new Set();
+  for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
+  if (ctx.tokens.length) {
+    for (const m of content.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
+      for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+        if (!cls || cls.length > 120) continue;
+        const r = resolveClass(cls, ctx);
+        if (r.kind === "token") for (const v of r.variables) out.add(v);
+      }
+    }
+    const semantic = ctx.tokens.filter((t) => t.kind === "semantic");
+    for (const m of content.matchAll(RN_ROOT)) {
+      const segs = m[0].split(".");
+      const cands = new Set();
+      for (let i = 0; i < segs.length; i++) cands.add(segs.slice(i).join("."));
+      for (const t of semantic) if (cands.has(t.name)) out.add(t.variable);
+    }
+  }
+  return uniqSorted([...out]);
 }
 
 // ---- Vue single-file components ----
@@ -347,7 +375,8 @@ function layoutRoutes(layoutPath, pagePaths) {
   return uniqSorted(routes);
 }
 
-export function buildInventory(files, { designMd = "" } = {}) {
+export function buildInventory(files, { designMd = "", tokenTexts = [] } = {}) {
+  const tctx = tokenCtx(designMd, tokenTexts);
   const fs = [...files].sort((a, b) => cmp(a.path, b.path));
   const unparsed = [];
   const components = [];
@@ -436,7 +465,7 @@ export function buildInventory(files, { designMd = "" } = {}) {
           path,
           props,
           variants,
-          tokensUsed: uniqSorted([...content.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1])),
+          tokensUsed: tokensIn(content, tctx),
           usage: { count: 0, files: [] },
           status: vueDeprecated(content, script, name, designMd) ? "deprecated" : "current",
         };
@@ -463,7 +492,7 @@ export function buildInventory(files, { designMd = "" } = {}) {
           path,
           props,
           variants,
-          tokensUsed: uniqSorted([...content.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1])),
+          tokensUsed: tokensIn(content, tctx),
           usage: { count: 0, files: [] },
           status: isDeprecated(content, name, designMd) ? "deprecated" : "current",
         });
@@ -703,6 +732,22 @@ export function replaceMarked(md, section) {
   return md.slice(0, s + START.length) + "\n\n" + section + "\n" + md.slice(e);
 }
 
+// Declared `token files` (Platform notes) read as text, never executed; paths stay inside the project.
+function tokenFileTexts(project, md) {
+  const line = /token files\s*:\s*(.+)/i.exec(md);
+  if (!line) return [];
+  const texts = [];
+  for (const raw of line[1].split(",")) {
+    const rel = raw.trim().replace(/^`|`$/g, "");
+    if (!rel) continue;
+    const abs = join(project, rel);
+    const back = relative(project, abs);
+    if (back.startsWith("..") || !existsSync(abs) || !isRegular(abs)) continue;
+    texts.push(readFileSync(abs, "utf8"));
+  }
+  return texts;
+}
+
 function main() {
   const argv = process.argv.slice(2);
   const i = argv.indexOf("--project");
@@ -714,7 +759,7 @@ function main() {
   const md = readFileSync(designPath, "utf8");
   if (formatOf(md) !== 2) throw new Error(`${designPath} is not format 2; rerun design-system init`);
   const files = walk(project).filter((f) => f.path !== relative(project, designPath).split(sep).join("/"));
-  const inv = buildInventory(files, { designMd: md });
+  const inv = buildInventory(files, { designMd: md, tokenTexts: tokenFileTexts(project, md) });
   const updated = replaceMarked(md, renderSections(inv));
   mkdirSync(join(project, "docs", "design"), { recursive: true });
   writeFileSync(join(project, "docs", "design", "inventory.json"), JSON.stringify(inv, null, 2) + "\n");

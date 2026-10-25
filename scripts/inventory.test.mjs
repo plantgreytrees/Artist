@@ -404,7 +404,10 @@ test("Vue: deprecated by a leading comment or by DESIGN.md, not by a deprecated 
         content: '<script setup lang="ts">\ndefineProps<{\n  /** @deprecated */\n  a?: string\n}>()\n</script>',
       },
     ],
-    { designMd: "Chip is deprecated; use Badge.\n" },
+    {
+      designMd:
+        "## Decisions\n| id | decision | why | date | supersedes |\n|---|---|---|---|---|\n| D1 | Deprecate Chip | old | 2026-01-01 | |\n",
+    },
   );
   assert.deepEqual(
     inv.components.map((c) => [c.name, c.status]),
@@ -459,4 +462,85 @@ test("CLI picks up .vue files", () => {
   assert.equal(r.status, 0, r.stderr);
   const inv = JSON.parse(readFileSync(join(dir, "docs/design/inventory.json"), "utf8"));
   assert.ok(inv.components.some((c) => c.name === "Tile" && c.path === "apps/web/src/components/vue/Tile.vue"));
+});
+
+// ---- tokensUsed and deprecation (ARCH-VERIFY-23) ----
+
+import { buildInventory } from "./inventory.mjs";
+const TW = join(FIX, "tailwind-v4");
+const twMd = readFileSync(join(TW, "DESIGN.md"), "utf8");
+const twCss = readFileSync(join(TW, "theme.css"), "utf8");
+const tsx = (name, body) => ({
+  path: `src/${name}.tsx`,
+  content: `export function ${name}() {\n  return ${body};\n}\n`,
+});
+
+test("Tailwind v4 fixture: utilities resolve to bound variables via token-refs", () => {
+  const inv = buildInventory([{ path: "src/Button.tsx", content: readFileSync(join(TW, "src/Button.tsx"), "utf8") }], {
+    designMd: twMd,
+    tokenTexts: [twCss],
+  });
+  const b = inv.components.find((c) => c.name === "Button");
+  assert.deepEqual(b.tokensUsed, ["--color-brand", "--color-surface", "--space-4"]);
+  assert.equal(inv.schema, 1);
+});
+
+test("CLI reads declared token files as text; inventory.json stays schema 1", () => {
+  const dir = copy();
+  const md = readFileSync(join(TW, "DESIGN.md"), "utf8");
+  writeFileSync(join(dir, "DESIGN.md"), md + "\n<!-- artist:inventory:start -->\n<!-- artist:inventory:end -->\n");
+  const r = run(dir);
+  assert.equal(r.status, 0, r.stderr);
+  const inv = JSON.parse(readFileSync(join(dir, "docs/design/inventory.json"), "utf8"));
+  const b = inv.components.find((c) => c.path === "tailwind-v4/src/Button.tsx");
+  assert.deepEqual(b.tokensUsed, ["--color-brand", "--color-surface", "--space-4"]);
+  assert.equal(inv.schema, 1);
+});
+
+test("RN theme member chain exact-matching a Semantic name is a token use", () => {
+  const md =
+    "## Semantic tokens\n| variable | name | primitive | use |\n|---|---|---|---|\n| --color-brand | color.brand | #1d6b4f | u |\n";
+  const inv = buildInventory(
+    [
+      tsx("A", "<View style={{ color: theme.color.brand }} />"),
+      tsx("B", "<View style={{ color: theme.color.brandish }} />"),
+      tsx("C", "<View style={{ color: other.color.brand }} />"),
+    ],
+    { designMd: md },
+  );
+  const used = Object.fromEntries(inv.components.map((c) => [c.name, c.tokensUsed]));
+  assert.deepEqual(used, { A: ["--color-brand"], B: [], C: [] });
+});
+
+const decisions = (rows) =>
+  `## Decisions\n| id | decision | why | date | supersedes |\n|---|---|---|---|---|\n${rows}\n`;
+
+test("a Deprecate <Name> Decisions row deprecates; prose deprecated-in-favour-of deprecates neither", () => {
+  const files = [tsx("Chip", "<span />"), tsx("Pill", "<span />"), tsx("Badge", "<span />")];
+  const md = decisions("| D1 | Deprecate Chip | old | 2026-01-01 | |") + "\nPill is deprecated in favour of Badge.\n";
+  const inv = buildInventory(files, { designMd: md });
+  assert.deepEqual(
+    inv.components.map((c) => [c.name, c.status]),
+    [
+      ["Badge", "current"],
+      ["Chip", "deprecated"],
+      ["Pill", "current"],
+    ],
+  );
+  const prose = buildInventory(files, {
+    designMd: decisions("| D1 | Pill is deprecated in favour of Badge | x | 2026-01-01 | |"),
+  });
+  assert.ok(prose.components.every((c) => c.status === "current"));
+});
+
+test("JSDoc @deprecated still deprecates", () => {
+  const inv = buildInventory(
+    [{ path: "src/Old.tsx", content: "/** @deprecated use New */\nexport function Old() {\n  return <i />;\n}\n" }],
+    { designMd: "" },
+  );
+  assert.equal(inv.components[0].status, "deprecated");
+});
+
+test("inventory.mjs never dynamically imports or requires", () => {
+  assert.doesNotMatch(readFileSync(CLI, "utf8"), /\brequire\s*\(|\bimport\s*\(/);
 });
