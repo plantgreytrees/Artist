@@ -45,7 +45,7 @@ units:
       read: [scripts/package.json]
       docs: [docs/architecture/verify.rules.md]
       write: [scripts/verify.test.mjs, scripts/fixtures/clean.html, scripts/fixtures/axe-violation.html]
-    arch: [ARCH-VERIFY-02, ARCH-VERIFY-03, ARCH-VERIFY-04, ARCH-VERIFY-06, ARCH-VERIFY-07, ARCH-VERIFY-08, ARCH-VERIFY-11]
+    arch: [ARCH-VERIFY-02, ARCH-VERIFY-03, ARCH-VERIFY-04, ARCH-VERIFY-06, ARCH-VERIFY-14, ARCH-VERIFY-08, ARCH-VERIFY-11]
     tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [], mcp: [] }
   - id: 3
     scope_id: verify-impl
@@ -58,7 +58,7 @@ units:
       read: [scripts/verify.test.mjs, scripts/fixtures/clean.html, scripts/fixtures/axe-violation.html, scripts/package.json]
       docs: [docs/architecture/verify.rules.md]
       write: [scripts/verify.mjs, scripts/verify.test.mjs]
-    arch: [ARCH-VERIFY-01, ARCH-VERIFY-02, ARCH-VERIFY-03, ARCH-VERIFY-04, ARCH-VERIFY-05, ARCH-VERIFY-06, ARCH-VERIFY-07, ARCH-VERIFY-08, ARCH-VERIFY-11]
+    arch: [ARCH-VERIFY-01, ARCH-VERIFY-02, ARCH-VERIFY-03, ARCH-VERIFY-04, ARCH-VERIFY-05, ARCH-VERIFY-06, ARCH-VERIFY-14, ARCH-VERIFY-08, ARCH-VERIFY-11]
     tooling: { implementer: implementer, gates: [security-auditor, performance-reviewer], skills: [test-driven-development, systematic-debugging], guards: [], mcp: [] }
   - id: 4
     scope_id: review-html
