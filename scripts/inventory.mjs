@@ -3,15 +3,16 @@
 // <project>/docs/design/inventory.json and rewrites only the marked section of
 // <project>/docs/design/DESIGN.md (falls back to <project>/DESIGN.md when the
 // former does not exist). Exit 0 on success, 2 on error.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, realpathSync, lstatSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const START = "<!-- artist:inventory:start -->";
 export const END = "<!-- artist:inventory:end -->";
 
-// Same capability map as reuse-check.mjs.
-const CAPS = {
+// Capability map shared with reuse-check.mjs (imported there).
+export const CAPS = {
   charts: ["chart.js", "react-chartjs-2", "recharts", "echarts", "apexcharts", "victory", "@nivo/*", "d3"],
   icons: ["lucide-react", "react-icons", "@heroicons/*", "@fortawesome/*"],
   "ui-kit": ["@mui/*", "antd", "@chakra-ui/*", "@radix-ui/*", "@headlessui/*", "@mantine/*"],
@@ -21,7 +22,13 @@ const CAPS = {
   state: ["zustand", "redux", "@reduxjs/toolkit", "jotai"],
 };
 const matches = (pat, name) => (pat.endsWith("/*") ? name.startsWith(pat.slice(0, -1)) : pat === name);
-const capOf = (name) => Object.keys(CAPS).find((c) => CAPS[c].some((p) => matches(p, name))) ?? null;
+export const capOf = (name) => Object.keys(CAPS).find((c) => CAPS[c].some((p) => matches(p, name))) ?? null;
+
+export function formatOf(md) {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
+  const f = fm && /^format:\s*(\d+)\s*$/m.exec(fm[1]);
+  return f ? Number(f[1]) : 1;
+}
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const uniqSorted = (xs) => [...new Set(xs)].sort(cmp);
@@ -243,25 +250,42 @@ export function renderSections(inv) {
   const schs = table(["name", "path", "kind", "fields"], inv.schemas.map((s) => [s.name, s.path, s.kind, s.fields.join(", ")]));
   const pks = table(["package", "version", "capability"], inv.packages.map((p) => [p.name, p.version, p.capability ?? ""]));
   const tail = inv.unparsed.length
-    ? `\n\n### Unparsed\n\n${table(["path", "reason"], inv.unparsed.map((u) => [u.path, u.reason]))}`
+    ? `\n\n## Unparsed\n\n${table(["path", "reason"], inv.unparsed.map((u) => [u.path, u.reason]))}`
     : "";
   return `## Components\n\n${comps}\n\n## Layouts\n\n${lays}\n\n## Schemas\n\n${schs}\n\n## Packages\n\n${pks}${tail}\n`;
 }
 
 const SKIP_DIRS = new Set(["node_modules", ".artist", ".git", ".worktrees"]);
+const skipped = (rel) => rel.split("/").some((seg) => SKIP_DIRS.has(seg));
+const isRegular = (abs) => { try { return lstatSync(abs).isFile(); } catch { return false; } };
+
+// Every existing regular project file, relative posix paths, sorted. In a git
+// repo: tracked + untracked-not-ignored (so ignored build output is excluded and
+// unstaged deletions are dropped). Outside git: a filesystem walk.
+export function listProjectFiles(project) {
+  let names = null;
+  try {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: project, stdio: "pipe" });
+    const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: project, encoding: "utf8", maxBuffer: 1 << 28 });
+    names = out.split("\0").filter(Boolean);
+  } catch { names = null; }
+  if (names === null) {
+    names = [];
+    const rec = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name)); continue; }
+        if (e.isFile()) names.push(relative(project, join(dir, e.name)).split(sep).join("/"));
+      }
+    };
+    rec(project);
+  }
+  return uniqSorted(names.filter((n) => !skipped(n) && isRegular(join(project, n))));
+}
+
 function walk(root) {
-  const out = [];
-  const rec = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => cmp(a.name, b.name))) {
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name)); continue; }
-      if (!e.isFile() || !/\.(tsx|jsx|ts|js|json)$/.test(e.name)) continue;
-      const rel = relative(root, join(dir, e.name)).split(sep).join("/");
-      if (rel === "docs/design/inventory.json") continue;
-      out.push({ path: rel, content: readFileSync(join(dir, e.name), "utf8") });
-    }
-  };
-  rec(root);
-  return out;
+  return listProjectFiles(root)
+    .filter((rel) => /\.(tsx|jsx|ts|js|json)$/.test(rel) && rel !== "docs/design/inventory.json")
+    .map((rel) => ({ path: rel, content: readFileSync(join(root, rel), "utf8") }));
 }
 
 export function replaceMarked(md, section) {
@@ -279,9 +303,7 @@ function main() {
   const designPath = existsSync(preferred) ? preferred : join(project, "DESIGN.md");
   if (!existsSync(designPath)) throw new Error(`no DESIGN.md at docs/design/DESIGN.md or DESIGN.md in ${project}`);
   const md = readFileSync(designPath, "utf8");
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
-  const fmt = fm && /^format:\s*(\d+)\s*$/m.exec(fm[1]);
-  if (!fmt || fmt[1] !== "2") throw new Error(`${designPath} is not format 2; rerun design-system init`);
+  if (formatOf(md) !== 2) throw new Error(`${designPath} is not format 2; rerun design-system init`);
   const files = walk(project).filter((f) => f.path !== relative(project, designPath).split(sep).join("/"));
   const inv = buildInventory(files, { designMd: md });
   const updated = replaceMarked(md, renderSections(inv));

@@ -151,3 +151,41 @@ test("buildInventory is pure and exported", async () => {
   assert.equal(inv.packages[0].capability, "state");
   assert.match(renderSections(inv), /## Packages/);
 });
+
+test("Unparsed renders as a level-2 section", async () => {
+  const { renderSections } = await import("./inventory.mjs");
+  const out = renderSections({ components: [], layouts: [], schemas: [], packages: [], unparsed: [{ path: "a.schema.json", reason: "bad" }] });
+  assert.match(out, /^## Unparsed$/m);
+  assert.doesNotMatch(out, /^###/m);
+});
+
+test("CAPS, capOf and formatOf are exported from inventory.mjs and defined once", async () => {
+  const inv = await import("./inventory.mjs");
+  assert.equal(inv.capOf("recharts"), "charts");
+  assert.equal(inv.capOf("nothing"), null);
+  assert.ok(inv.CAPS.charts.includes("d3"));
+  assert.equal(inv.formatOf("---\nformat: 2\n---\n"), 2);
+  assert.equal(inv.formatOf("# x"), 1);
+  const src = readFileSync(join(here, "reuse-check.mjs"), "utf8");
+  assert.doesNotMatch(src, /const CAPS\b|const capOf\b|function formatOf\b/);
+});
+
+test("listProjectFiles honours .gitignore in a repo and walks outside git", async () => {
+  const { listProjectFiles } = await import("./inventory.mjs");
+  const d = mkdtempSync(join(tmpdir(), "lpf-"));
+  mkdirSync(join(d, "dist"));
+  mkdirSync(join(d, "src"));
+  mkdirSync(join(d, "node_modules/x"), { recursive: true });
+  writeFileSync(join(d, "dist/a.tsx"), "x");
+  writeFileSync(join(d, "src/b.tsx"), "x");
+  writeFileSync(join(d, "src/gone.tsx"), "x");
+  writeFileSync(join(d, "node_modules/x/c.js"), "x");
+  assert.deepEqual(listProjectFiles(d), ["dist/a.tsx", "src/b.tsx", "src/gone.tsx"]);
+  const g = (...a) => spawnSync("git", ["-C", d, ...a], { encoding: "utf8" });
+  g("init", "-q");
+  writeFileSync(join(d, ".gitignore"), "dist/\n");
+  g("add", "-A");
+  g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c");
+  (await import("node:fs")).rmSync(join(d, "src/gone.tsx"));
+  assert.deepEqual(listProjectFiles(d), [".gitignore", "src/b.tsx"]);
+});
