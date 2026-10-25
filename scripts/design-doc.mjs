@@ -5,7 +5,7 @@
 // Imports design-md only; never the reuse audit module (ARCH-VERIFY-25).
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { formatOf, tokensOf, componentTokensOf, decisionsOf } from "./design-md.mjs";
 
@@ -65,6 +65,8 @@ const headersOf = (rows) => [...new Set(rows.flatMap((r) => Object.keys(r)))];
 const section = (id, title, body) => `<section id="${esc(id)}"><h2>${esc(title)}</h2>${body}</section>`;
 const generic = (rows) => table(headersOf(rows), rows);
 
+// Append-only (ARCH-PLUGIN-39): a row may only supersede a row above it, so no forward
+// reference and no cycle can be expressed.
 function validateDecisions(rows) {
   const ids = new Set();
   for (const r of rows) {
@@ -73,17 +75,37 @@ function validateDecisions(rows) {
     if (ids.has(id)) throw new UserError(`duplicate Decisions id: ${id}`);
     ids.add(id);
   }
+  const earlier = new Set();
   for (const r of rows) {
+    const id = r.id.trim();
     const refs = (r.supersedes ?? "")
       .split(/[,\s]+/)
       .map((x) => x.trim())
       .filter((x) => x && !/^[-–—]+$/.test(x));
     for (const ref of refs) {
-      if (ref === r.id.trim() || !ids.has(ref)) {
-        throw new UserError(`Decisions ${r.id.trim()}: supersedes "${ref}" does not resolve to another Decisions id`);
+      if (ref === id || !ids.has(ref)) {
+        throw new UserError(`Decisions ${id}: supersedes "${ref}" does not resolve to another Decisions id`);
       }
+      if (!earlier.has(ref)) throw new UserError(`Decisions ${id}: supersedes "${ref}" must name an earlier row`);
     }
+    earlier.add(id);
   }
+}
+
+// inventory.json cells: props are objects ({name, type, ...}), variants map a prop to its
+// values, usage is {count, files}; render each as text, never as "[object Object]".
+const isScalar = (v) => ["string", "number", "boolean"].includes(typeof v);
+const itemText = (x) => (x && typeof x === "object" && !Array.isArray(x) ? String(x.name ?? "") : String(x));
+function cellText(v) {
+  if (isScalar(v)) return String(v);
+  if (Array.isArray(v)) return v.map(itemText).join(", ");
+  if (v && typeof v === "object") {
+    return Object.entries(v)
+      .filter(([, x]) => isScalar(x) || Array.isArray(x))
+      .map(([k, x]) => `${k}: ${Array.isArray(x) ? x.map(itemText).join("|") : String(x)}`)
+      .join("; ");
+  }
+  return null;
 }
 
 function inventorySection(inv) {
@@ -93,9 +115,9 @@ function inventorySection(inv) {
     const items = Array.isArray(inv[key]) ? inv[key] : [];
     const rows = items.map((it) =>
       Object.fromEntries(
-        Object.entries(it)
-          .filter(([, v]) => ["string", "number", "boolean"].includes(typeof v) || Array.isArray(v))
-          .map(([k, v]) => [k, Array.isArray(v) ? v.map(String).join(", ") : String(v)]),
+        Object.entries(it ?? {})
+          .map(([k, v]) => [k, cellText(v)])
+          .filter(([, v]) => v !== null),
       ),
     );
     parts.push(`<h3>${esc(key)}</h3>${table(headersOf(rows), rows, esc)}`);
@@ -114,6 +136,8 @@ function reuseSection(reuse) {
       const nums = CATEGORY_KEYS.map((k) => r?.[k]);
       if (!nums.every((n) => Number.isInteger(n) && n >= 0))
         throw new UserError(`reuse.json ratios.${cat} is malformed`);
+      if (nums[0] + nums[1] + nums[2] !== nums[3])
+        throw new UserError(`reuse.json ratios.${cat}: conforming + justified + unjustified !== total`);
       return `<tr data-category="${esc(cat)}"><th>${esc(cat)}</th>${nums.map((n) => `<td class="num">${n}</td>`).join("")}</tr>`;
     });
   return section(
@@ -188,9 +212,36 @@ export function render(entries, texts) {
   );
 }
 
+// The manifest lives in a committed, editable file: --check trusts none of it. Roles are fixed,
+// design and inventory paths are fixed, and a reuse path must stay inside the project.
+const DESIGN_PATHS = ["DESIGN.md", "docs/design/DESIGN.md"];
+const INVENTORY_PATH = "docs/design/inventory.json";
+const insideProject = (project, path) => {
+  if (typeof path !== "string" || !path || isAbsolute(path)) return false;
+  const rel = relative(project, resolve(project, path));
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+};
+function validateSpecs(project, specs) {
+  const seen = new Set();
+  for (const [role, path] of specs) {
+    const ok =
+      !seen.has(role) &&
+      ((role === "design" && DESIGN_PATHS.includes(path)) ||
+        (role === "inventory" && path === INVENTORY_PATH) ||
+        (role === "reuse" && insideProject(project, path)));
+    if (!ok) throw new UserError(`manifest input rejected: ${JSON.stringify({ role, path })}`);
+    seen.add(role);
+  }
+  if (!seen.has("design")) throw new UserError("manifest has no design input");
+}
+
 function readEntry(project, role, path) {
   const abs = resolve(project, path);
   if (!existsSync(abs)) return null;
+  if (!lstatSync(abs).isFile()) throw new UserError(`manifest input is not a regular file: ${path}`);
+  const real = realpathSync(abs);
+  const root = realpathSync(project);
+  if (!real.startsWith(root + sep)) throw new UserError(`manifest input resolves outside the project: ${path}`);
   const buf = readFileSync(abs);
   return { entry: { role, path, sha256: sha256(buf) }, text: buf.toString("utf8") };
 }
@@ -199,11 +250,12 @@ function gather(project, reusePath) {
   const designRel = existsSync(join(project, "docs", "design", "DESIGN.md")) ? "docs/design/DESIGN.md" : "DESIGN.md";
   const specs = [["design", designRel]];
   if (existsSync(join(project, "docs", "design", "inventory.json"))) {
-    specs.push(["inventory", "docs/design/inventory.json"]);
+    specs.push(["inventory", INVENTORY_PATH]);
   }
   if (reusePath) {
-    const abs = resolve(reusePath);
-    specs.push(["reuse", posix(isAbsolute(reusePath) ? relative(project, abs) : relative(project, abs))]);
+    const rel = posix(relative(project, resolve(project, reusePath)));
+    if (!insideProject(project, rel)) throw new UserError(`--reuse must be a file inside the project: ${reusePath}`);
+    specs.push(["reuse", rel]);
   }
   return specs;
 }
@@ -214,6 +266,9 @@ function build(project, specs, { missingIsStale }) {
   for (const [role, path] of specs) {
     const r = readEntry(project, role, path);
     if (!r) {
+      // The audit's reuse.json is a run artefact (.artist/ is usually gitignored): its absence
+      // means the ratios cannot be recomputed, not that the page is stale.
+      if (missingIsStale && role === "reuse") throw new UserError(`reuse input ${path} absent; rerun audit to re-verify`);
       if (missingIsStale) return { stale: `${path} is missing` };
       throw new UserError(`${role === "design" ? "DESIGN.md" : path} not found`);
     }
@@ -245,7 +300,8 @@ export function main(argv) {
     } catch {
       throw new UserError(`${OUT_REL} carries no readable manifest`);
     }
-    const specs = manifest.inputs.map((e) => [e.role, e.path]);
+    const specs = manifest.inputs.map((e) => [e?.role, e?.path]);
+    validateSpecs(project, specs);
     const r = build(project, specs, { missingIsStale: true });
     if (r.stale) {
       console.error(`design-doc: stale: ${r.stale}`);
@@ -265,7 +321,6 @@ export function main(argv) {
   return 0;
 }
 
-import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {

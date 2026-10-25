@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, cpSync, readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,7 +122,10 @@ test("--check recomputes over the manifest set including --reuse", () => {
   const reuse = join(dir, "reuse.json");
   assert.equal(run(dir, "--reuse", reuse).status, 0);
   assert.equal(run(dir, "--check").status, 0);
-  writeFileSync(reuse, readFileSync(reuse, "utf8").replace('"conforming": 10', '"conforming": 11'));
+  writeFileSync(
+    reuse,
+    readFileSync(reuse, "utf8").replace('"conforming": 10', '"conforming": 11').replace('"total": 15', '"total": 16'),
+  );
   assert.equal(run(dir, "--check").status, 1);
 });
 
@@ -164,4 +167,146 @@ test("--reuse renders four numbers per category and no total score", () => {
 
 test("design-doc never imports reuse-check", () => {
   assert.doesNotMatch(readFileSync(SCRIPT, "utf8"), /reuse-check/);
+});
+
+// ---- scrutinise round 1 ----------------------------------------------------
+const META = /<meta name="artist-design-doc-manifest" content="([^"]*)">/;
+const unescHtml = (x) =>
+  x.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+const escHtml = (x) => x.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function tamper(dir, fn) {
+  const p = join(dir, ...OUT);
+  const h = readFileSync(p, "utf8");
+  const m = JSON.parse(unescHtml(META.exec(h)[1]));
+  fn(m);
+  writeFileSync(p, h.replace(META, () => `<meta name="artist-design-doc-manifest" content="${escHtml(JSON.stringify(m))}">`));
+}
+
+test("inventory renders object props by name and variants as prop: a|b", () => {
+  const dir = project("clean");
+  const inv = {
+    schema: 1,
+    components: [
+      {
+        name: "Button",
+        path: "src/Button.tsx",
+        props: [
+          { name: "size", type: "'sm' | 'lg'", optional: true, values: ["sm", "lg"] },
+          { name: "onClick", type: "() => void", optional: false },
+        ],
+        variants: { size: ["sm", "lg"] },
+        usage: { count: 3, files: ["src/App.tsx"] },
+      },
+    ],
+    layouts: [],
+    schemas: [],
+    packages: [],
+  };
+  writeFileSync(join(dir, "docs", "design", "inventory.json"), JSON.stringify(inv));
+  assert.equal(run(dir).status, 0);
+  const h = html(dir);
+  assert.ok(!h.includes("[object Object]"));
+  assert.match(h, /<td>size, onClick<\/td>/);
+  assert.ok(h.includes("size: sm|lg"));
+  assert.ok(h.includes("count: 3"));
+});
+
+test("--reuse resolves against --project, not the cwd", () => {
+  const dir = project("clean");
+  const elsewhere = mkdtempSync(join(tmpdir(), "dd-cwd-"));
+  const opts = { encoding: "utf8", cwd: elsewhere };
+  assert.equal(spawnSync("node", [SCRIPT, "--project", dir, "--reuse", "reuse.json"], opts).status, 0);
+  const m = JSON.parse(unescHtml(META.exec(html(dir))[1]));
+  assert.deepEqual(m.inputs.find((e) => e.role === "reuse").path, "reuse.json");
+  assert.equal(spawnSync("node", [SCRIPT, "--project", dir, "--check"], opts).status, 0);
+});
+
+test("--reuse outside the project exits 2", () => {
+  const dir = project("clean");
+  const outside = join(mkdtempSync(join(tmpdir(), "dd-out-")), "reuse.json");
+  cpSync(join(dir, "reuse.json"), outside);
+  assert.equal(run(dir, "--reuse", outside).status, 2);
+});
+
+test("--check exits 2, not stale, when the audit's reuse input is absent", () => {
+  const dir = project("clean");
+  mkdirSync(join(dir, ".artist", "audit"), { recursive: true });
+  cpSync(join(dir, "reuse.json"), join(dir, ".artist", "audit", "reuse.json"));
+  assert.equal(run(dir, "--reuse", ".artist/audit/reuse.json").status, 0);
+  assert.equal(run(dir, "--check").status, 0);
+  rmSync(join(dir, ".artist"), { recursive: true });
+  const r = run(dir, "--check");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /reuse input \.artist\/audit\/reuse\.json absent; rerun audit to re-verify/);
+  // a missing inventory input is still stale
+  const d2 = project("clean");
+  assert.equal(run(d2).status, 0);
+  rmSync(join(d2, "docs", "design", "inventory.json"));
+  assert.equal(run(d2, "--check").status, 1);
+});
+
+test("--check rejects untrusted manifest roles and paths before reading", () => {
+  const cases = [
+    (m) => m.inputs.push({ role: "secret", path: "DESIGN.md", sha256: "0" }),
+    (m) => (m.inputs.find((e) => e.role === "design").path = "/etc/passwd"),
+    (m) => (m.inputs.find((e) => e.role === "design").path = "other.md"),
+    (m) => (m.inputs.find((e) => e.role === "inventory").path = "x.json"),
+    (m) => m.inputs.push({ role: "reuse", path: "../../etc/passwd", sha256: "0" }),
+    (m) => m.inputs.push({ role: "reuse", path: "/etc/passwd", sha256: "0" }),
+    (m) => m.inputs.push({ role: "reuse", path: "docs", sha256: "0" }),
+    (m) => m.inputs.push({ role: "reuse", path: 7, sha256: "0" }),
+    (m) => m.inputs.push({ role: "reuse", path: "outlink/reuse.json", sha256: "0" }),
+  ];
+  for (const [i, fn] of cases.entries()) {
+    const dir = project("clean");
+    assert.equal(run(dir).status, 0);
+    const outside = mkdtempSync(join(tmpdir(), "dd-link-"));
+    writeFileSync(join(outside, "reuse.json"), readFileSync(join(dir, "reuse.json")));
+    symlinkSync(outside, join(dir, "outlink"));
+    tamper(dir, fn);
+    const r = run(dir, "--check");
+    assert.equal(r.status, 2, `case ${i}: ${r.stderr}`);
+    assert.match(r.stderr, /manifest/, `case ${i}`);
+  }
+});
+
+test("a supersedes naming a later row exits 2 (append-only)", () => {
+  const dir = project("clean");
+  const p = join(dir, "DESIGN.md");
+  writeFileSync(
+    p,
+    readFileSync(p, "utf8")
+      .replace("| 2026-01-01 | |", "| 2026-01-01 | D2 |")
+      .replace("| 2026-02-01 | D1 |", "| 2026-02-01 | |"),
+  );
+  const r = run(dir);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /earlier/);
+});
+
+test("a ratio breaking conforming + justified + unjustified === total exits 2", () => {
+  const dir = project("clean");
+  const reuse = join(dir, "reuse.json");
+  writeFileSync(reuse, readFileSync(reuse, "utf8").replace('"total": 15', '"total": 99'));
+  const r = run(dir, "--reuse", reuse);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /colours/);
+});
+
+test("hostile inventory.json and reuse.json keys and values are escaped", () => {
+  const dir = project("clean");
+  const bad = "<script>alert(1)</script><img src=x onerror=y>javascript:z";
+  writeFileSync(
+    join(dir, "docs", "design", "inventory.json"),
+    JSON.stringify({ schema: 1, components: [{ name: bad, [bad]: bad, props: [{ name: bad }] }], layouts: [], schemas: [], packages: [] }),
+  );
+  writeFileSync(
+    join(dir, "reuse.json"),
+    JSON.stringify({ schema: 3, ratios: { [bad]: { conforming: 1, justified: 0, unjustified: 0, total: 1 } } }),
+  );
+  assert.equal(run(dir, "--reuse", join(dir, "reuse.json")).status, 0);
+  const h = html(dir);
+  assert.doesNotMatch(h, /<script/i);
+  assert.doesNotMatch(h, /<img/i);
+  assert.ok(h.includes("&lt;script&gt;"));
 });
