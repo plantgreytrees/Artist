@@ -59,3 +59,12 @@ be gitignored in target projects (the `design-system init` skill offers to add i
 ## Glossary
 - **Loopback**: localhost addresses only.
 - **Median of 3**: the middle value of three measurements.
+
+## Amendment 2026-10-25: inventory and whole-project consistency
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-VERIFY-15 (supersedes 12) | reuse-check schema 2: also flags every colour literal outside the token/theme files, off-scale spacing, raw durations/easings, missing reduced-motion fallbacks; `--all` scans the whole project and adds stale inventory entries and near-duplicate components | one deterministic tool enforces one consistent, re-brandable design | model-judged audit; changed files only |
+| ARCH-VERIFY-16 | inventory.mjs writes docs/design/inventory.json (components with props, variants, tokens used, usage, status; layouts with routes; zod/yup/JSON Schema/TS schemas; packages) and regenerates DESIGN.md's marked sections | deep, current knowledge of what exists, readable in DESIGN.md and exact in JSON | hand-maintained tables |
+
+**Known limit:** prop and schema extraction is static (regex and light parsing, no TypeScript compiler), so unusual patterns may be missed; the inventory marks what it could not parse.

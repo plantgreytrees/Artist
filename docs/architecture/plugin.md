@@ -103,3 +103,27 @@ sequenceDiagram
 - **NOT ISOLATED**: the critique ran in the building session, not a fresh agent.
 - **CWV**: Core Web Vitals (LCP, CLS).
 - **Token**: a named design value (colour, size, spacing) in DESIGN.md.
+
+## Amendment 2026-10-25: design depth, white-labelling, consistency, motion
+Asked for after the first build: artist should know and maintain every component, layout and schema, use colours as variables so a product can be re-branded, keep one consistent design across the platform, and treat animation as part of the design.
+
+```mermaid
+flowchart LR
+  DS[skills/design-system] -->|init / audit| INV[scripts/inventory.mjs]
+  INV --> IJ[(docs/design/inventory.json)]
+  INV -->|marked sections| DM[(docs/design/DESIGN.md format 2)]
+  DS -->|audit| RC[scripts/reuse-check.mjs --all]
+  RC --> CR[(docs/design/consistency.md)]
+  CRE[skills/create] --> RC2[reuse-check changed files]
+  OPT[skills/optimise] --> RC2
+  DM -->|semantic tokens, themes, motion| CRE
+```
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-PLUGIN-25 (supersedes 22) | DESIGN.md format 2: primitives, semantic tokens mapped to CSS variables, one or more brand themes (light and dark), motion tokens, and generated Components / Layouts / Schemas / Packages sections | white-labelling is a theme swap; the inventory is generated so it cannot drift | literal tokens only; one brand only; hand-maintained inventory |
+| ARCH-PLUGIN-26 (supersedes 23) | Reuse components, layouts, schemas, semantic tokens and installed packages; colours, spacing and motion only through tokens outside the definition files | a hard-coded value that equals today's brand colour breaks the next re-brand | allowing literals that match a token |
+| ARCH-PLUGIN-27 | design-system runs inventory.mjs on init and audit; audit runs reuse-check --all and writes docs/design/consistency.md | keeps the whole platform consistent, not just the files a run touched | changed files only |
+| ARCH-PLUGIN-28 | Animated components use motion tokens and a reduced-motion fallback | animation is a design decision and an accessibility requirement | guidance only; video capture of motion |
+
+**Trade-off:** strict literal checks will flag existing code on the first `audit`. That is the point of the consistency report, and each item can be fixed or justified.
