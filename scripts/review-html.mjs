@@ -5,21 +5,42 @@ import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cwvPasses } from "./verify.mjs";
 
-export const DIMENSIONS = ["Hierarchy", "Typography", "Spacing & rhythm", "Colour & contrast", "Distinctiveness", "Responsiveness", "Accessibility", "Motion"];
+export const DIMENSIONS = [
+  "Hierarchy",
+  "Typography",
+  "Spacing & rhythm",
+  "Colour & contrast",
+  "Distinctiveness",
+  "Responsiveness",
+  "Accessibility",
+  "Motion",
+];
 
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const relPath = (outDir, runDir, file) => relative(resolve(outDir), join(resolve(runDir), String(file))).split("\\").join("/");
+const esc = (s) =>
+  String(s ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+const relPath = (outDir, runDir, file) =>
+  relative(resolve(outDir), join(resolve(runDir), String(file)))
+    .split("\\")
+    .join("/");
 
 function readReuse(runDir) {
   const p = join(runDir, "reuse.json");
   if (!existsSync(p)) return null;
   // An unreadable reuse.json must never let the verdict read PASS.
-  try { return JSON.parse(readFileSync(p, "utf8")); } catch { return { unreadable: true }; }
+  try {
+    return JSON.parse(readFileSync(p, "utf8"));
+  } catch {
+    return { unreadable: true };
+  }
 }
 
 function slider(bp, before, after, i) {
   const id = `cmp-${i}`;
-  if (!before) return `<figure><figcaption>${esc(bp)}px</figcaption><img src="${esc(after)}" alt="${esc(bp)}px screenshot"></figure>`;
+  if (!before)
+    return `<figure><figcaption>${esc(bp)}px</figcaption><img src="${esc(after)}" alt="${esc(bp)}px screenshot"></figure>`;
   return `<div class="cmp" data-cmp style="--pos:50%">
 <h3>${esc(bp)}px</h3>
 <div class="stack"><img src="${esc(before)}" alt="Before at ${esc(bp)}px"><div class="top"><img src="${esc(after)}" alt="After at ${esc(bp)}px"></div></div>
@@ -38,13 +59,32 @@ function rubric(r, n) {
 
 function reuseSection(reuse) {
   if (!reuse) return "";
-  if (reuse.unreadable) return `<section><h2>Reuse findings</h2><p class="warn">reuse.json unreadable: rerun reuse-check.</p></section>`;
-  const groups = [["New components", "new_components"], ["New layouts", "new_layouts"], ["Raw colours", "raw_colours"], ["Raw spacing", "raw_spacing"], ["Raw motion", "raw_motion"], ["Missing reduced motion", "missing_reduced_motion"], ["New packages", "new_packages"], ["Stale inventory", "stale_inventory"], ["Near-duplicates", "near_duplicates"]];
-  const rows = groups.filter(([, k]) => reuse[k] !== undefined || !["stale_inventory", "near_duplicates"].includes(k)).map(([t, k]) => {
-    const items = reuse[k] || [];
-    const li = items.map((it) => `<li class="${it.justified ? "ok" : "bad"}"><code>${esc(it.name ?? it.value)}</code> <small>${esc(it.file)}:${esc(it.line)}</small> <strong>${it.justified ? "justified" : "unjustified"}</strong>${it.reason ? ` - ${esc(it.reason)}` : ""}${it.duplicates ? ` <em>duplicates: ${esc([].concat(it.duplicates).join(", "))}</em>` : ""}</li>`).join("");
-    return `<h3>${t}</h3>${items.length ? `<ul>${li}</ul>` : "<p>None.</p>"}`;
-  }).join("");
+  if (reuse.unreadable)
+    return `<section><h2>Reuse findings</h2><p class="warn">reuse.json unreadable: rerun reuse-check.</p></section>`;
+  const groups = [
+    ["New components", "new_components"],
+    ["New layouts", "new_layouts"],
+    ["Raw colours", "raw_colours"],
+    ["Raw spacing", "raw_spacing"],
+    ["Raw motion", "raw_motion"],
+    ["Missing reduced motion", "missing_reduced_motion"],
+    ["New packages", "new_packages"],
+    ["Stale inventory", "stale_inventory"],
+    ["Near-duplicates", "near_duplicates"],
+  ];
+  const rows = groups
+    .filter(([, k]) => reuse[k] !== undefined || !["stale_inventory", "near_duplicates"].includes(k))
+    .map(([t, k]) => {
+      const items = reuse[k] || [];
+      const li = items
+        .map(
+          (it) =>
+            `<li class="${it.justified ? "ok" : "bad"}"><code>${esc(it.name ?? it.value)}</code> <small>${esc(it.file)}:${esc(it.line)}</small> <strong>${it.justified ? "justified" : "unjustified"}</strong>${it.reason ? ` - ${esc(it.reason)}` : ""}${it.duplicates ? ` <em>duplicates: ${esc([].concat(it.duplicates).join(", "))}</em>` : ""}</li>`,
+        )
+        .join("");
+      return `<h3>${t}</h3>${items.length ? `<ul>${li}</ul>` : "<p>None.</p>"}`;
+    })
+    .join("");
   return `<section><h2>Reuse findings</h2><p>Unjustified: ${esc(reuse.unjustified ?? 0)}</p>${rows}</section>`;
 }
 
@@ -86,14 +126,21 @@ export function renderReview({ rounds, tokenDiff, outDir }) {
   const reuse = readReuse(latest.runDir);
   const verdict = passes(latest, reuse) ? "PASS" : "NEEDS WORK";
   const bps = rep.breakpoints || Object.keys(rep.screenshots || {});
-  const cmp = bps.map((bp, i) => {
-    const after = rep.screenshots?.[bp];
-    if (!after) return "";
-    const b = prev?.report?.screenshots?.[bp];
-    return slider(bp, b ? relPath(outDir, prev.runDir, b) : null, relPath(outDir, latest.runDir, after), i);
-  }).join("");
+  const cmp = bps
+    .map((bp, i) => {
+      const after = rep.screenshots?.[bp];
+      if (!after) return "";
+      const b = prev?.report?.screenshots?.[bp];
+      return slider(bp, b ? relPath(outDir, prev.runDir, b) : null, relPath(outDir, latest.runDir, after), i);
+    })
+    .join("");
   const axe = rep.axe || {};
-  const vio = (axe.violations || []).map((v) => `<tr><td>${esc(v.id)}</td><td>${esc(v.impact)}</td><td>${esc(v.help)}</td><td>${esc(v.nodes)}</td><td>${esc((v.breakpoints || []).join(", "))}</td><td>${(v.targets || []).map((t) => `<code>${esc(t)}</code>`).join("<br>")}</td></tr>`).join("");
+  const vio = (axe.violations || [])
+    .map(
+      (v) =>
+        `<tr><td>${esc(v.id)}</td><td>${esc(v.impact)}</td><td>${esc(v.help)}</td><td>${esc(v.nodes)}</td><td>${esc((v.breakpoints || []).join(", "))}</td><td>${(v.targets || []).map((t) => `<code>${esc(t)}</code>`).join("<br>")}</td></tr>`,
+    )
+    .join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Review: ${esc(rep.url)}</title><style>${CSS}</style></head><body>
 <header><h1>Design review</h1><p>URL: ${esc(rep.url)}<br>Time: ${esc(rep.generated_at)}<br>Final verdict: <strong>${verdict}</strong></p></header>
 <section><h2>Before / after</h2>${cmp || "<p>No screenshots.</p>"}</section>
@@ -112,11 +159,14 @@ function loadRound(runDir, extra = {}) {
 function main(argv) {
   if (argv[0] === "--rounds") {
     const oi = argv.indexOf("--out");
-    if (!argv[1] || oi < 0 || !argv[oi + 1]) throw new Error("usage: review-html.mjs --rounds <rounds.json> --out <dir>");
+    if (!argv[1] || oi < 0 || !argv[oi + 1])
+      throw new Error("usage: review-html.mjs --rounds <rounds.json> --out <dir>");
     const spec = JSON.parse(readFileSync(argv[1], "utf8"));
     const list = Array.isArray(spec) ? spec : spec.rounds;
     const outDir = argv[oi + 1];
-    const rounds = list.map((r) => loadRound(r.runDir, { scores: r.scores, critique: r.critique, isolated: r.isolated }));
+    const rounds = list.map((r) =>
+      loadRound(r.runDir, { scores: r.scores, critique: r.critique, isolated: r.isolated }),
+    );
     writeFileSync(join(outDir, "review.html"), renderReview({ rounds, tokenDiff: spec.tokenDiff, outDir }));
   } else if (argv[0]) {
     writeFileSync(join(argv[0], "review.html"), renderReview({ rounds: [loadRound(argv[0])], outDir: argv[0] }));
@@ -124,5 +174,10 @@ function main(argv) {
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { main(process.argv.slice(2)); } catch (e) { console.error(e.message); process.exit(2); }
+  try {
+    main(process.argv.slice(2));
+  } catch (e) {
+    console.error(e.message);
+    process.exit(2);
+  }
 }

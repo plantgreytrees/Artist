@@ -11,9 +11,17 @@ function sections(md) {
   let cur = null;
   for (const line of md.split(/\r?\n/)) {
     const h = /^##\s+(.+?)\s*$/.exec(line);
-    if (h) { cur = h[1]; out[cur] = []; continue; }
+    if (h) {
+      cur = h[1];
+      out[cur] = [];
+      continue;
+    }
     if (cur && line.trim().startsWith("|")) {
-      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((s) => s.trim());
+      const cells = line
+        .trim()
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map((s) => s.trim());
       if (cells.every((c) => /^:?-+:?$/.test(c))) continue;
       out[cur].push(cells);
     }
@@ -22,8 +30,12 @@ function sections(md) {
   return out;
 }
 
-const hexOf = (n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, "0");
-const COLOUR_RE = /(?<![\w&])(?<!\b(?:href|id)\s*=\s*["']?)#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])|\b(rgba?|hsla?)\(\s*([^)]*?)\s*\)/gi;
+const hexOf = (n) =>
+  Math.max(0, Math.min(255, Number(n)))
+    .toString(16)
+    .padStart(2, "0");
+const COLOUR_RE =
+  /(?<![\w&])(?<!\b(?:href|id)\s*=\s*["']?)#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])|\b(rgba?|hsla?)\(\s*([^)]*?)\s*\)/gi;
 
 function normColour(m) {
   if (m[1] !== undefined) {
@@ -53,7 +65,10 @@ function colours(text) {
 const lineOf = (text, idx) => text.slice(0, idx).split("\n").length;
 const justify = (item, just) => {
   const key = [item.name, item.value, item.file].find((k) => k !== undefined && Object.hasOwn(just, k));
-  if (key !== undefined) { item.justified = true; item.reason = String(just[key]); } else item.justified = false;
+  if (key !== undefined) {
+    item.justified = true;
+    item.reason = String(just[key]);
+  } else item.justified = false;
   return item;
 };
 
@@ -66,7 +81,11 @@ function tokenFiles(md) {
   const out = new Set();
   for (const line of md.split(/\r?\n/)) {
     const m = /^\s*[-*]?\s*(?:token|theme)[^:\n]*files?[^:\n]*:\s*(.+)$/i.exec(line);
-    if (m) for (const f of m[1].split(",")) { const t = f.replace(/[`*]/g, "").trim().replace(/^\.\//, ""); if (t) out.add(t); }
+    if (m)
+      for (const f of m[1].split(",")) {
+        const t = f.replace(/[`*]/g, "").trim().replace(/^\.\//, "");
+        if (t) out.add(t);
+      }
   }
   return out;
 }
@@ -74,7 +93,8 @@ const isTokenFile = (set, p) => [...set].some((t) => (t.endsWith("/") ? p.starts
 
 const SPACING_PROP = String.raw`(?:padding|margin|gap|row-gap|column-gap|rowGap|columnGap)(?:-?(?:Top|Right|Bottom|Left|top|right|bottom|left|block|inline)(?:-?(?:start|end|Start|End))?)?`;
 const CSS_SPACING = new RegExp(String.raw`(?<![\w-])${SPACING_PROP}\s*:\s*([^;}\n]*)`, "g");
-const TW_SPACING = /(?<![\w-])(?:[\w-]+:)*-?(?:p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy])-\[(\d*\.?\d+)(px|rem)\]/g;
+const TW_SPACING =
+  /(?<![\w-])(?:[\w-]+:)*-?(?:p[xytrblse]?|m[xytrblse]?|gap(?:-[xy])?|space-[xy])-\[(\d*\.?\d+)(px|rem)\]/g;
 const JS_BARE_SPACING = new RegExp(String.raw`(?<![\w-])${SPACING_PROP}\s*:\s*(\d*\.?\d+)\s*[,}]`, "g");
 const LEN = /(?<![\w.#-])-?(\d*\.?\d+)(px|rem)\b/g;
 const DUR = /(?<![\w.#-])(\d*\.?\d+)(ms|s)\b/g;
@@ -84,11 +104,17 @@ const JS_DURATION = /(?<![\w-])duration\s*:\s*(\d*\.?\d+)\s*[,}\n]/g;
 const BEZIER = /cubic-bezier\(([^)]*)\)/gi;
 
 const ANIMATED = [
-  /(?<![\w-])(?:animation|transition)(?:-[a-z-]+)?\s*:/, /@keyframes\b/,
-  /\bmotion\.[A-Za-z]/, /\banimate\s*=/, /\btransition\s*=/,
-  /\bgsap\./, /\bAnimated\./, /\b(?:useSharedValue|withTiming)\b/,
+  /(?<![\w-])(?:animation|transition)(?:-[a-z-]+)?\s*:/,
+  /@keyframes\b/,
+  /\bmotion\.[A-Za-z]/,
+  /\banimate\s*=/,
+  /\btransition\s*=/,
+  /\bgsap\./,
+  /\bAnimated\./,
+  /\b(?:useSharedValue|withTiming)\b/,
 ];
-const REDUCED = /prefers-reduced-motion|motion-reduce:|motion-safe:|useReducedMotion|isReduceMotionEnabled|reduceMotion/;
+const REDUCED =
+  /prefers-reduced-motion|motion-reduce:|motion-safe:|useReducedMotion|isReduceMotionEnabled|reduceMotion/;
 
 function scanSpacing(text, scale) {
   const hits = [];
@@ -96,17 +122,25 @@ function scanSpacing(text, scale) {
   for (const m of text.matchAll(CSS_SPACING)) {
     for (const l of m[1].matchAll(LEN)) if (off(toPx(l[1], l[2]))) hits.push({ value: l[1] + l[2], index: m.index });
   }
-  for (const m of text.matchAll(TW_SPACING)) if (off(toPx(m[1], m[2]))) hits.push({ value: m[1] + m[2], index: m.index });
+  for (const m of text.matchAll(TW_SPACING))
+    if (off(toPx(m[1], m[2]))) hits.push({ value: m[1] + m[2], index: m.index });
   for (const m of text.matchAll(JS_BARE_SPACING)) if (off(num(m[1]))) hits.push({ value: m[1] + "px", index: m.index });
   return hits;
 }
 
 function scanMotion(text, mo) {
   const hits = [];
-  const dur = (n, u, index, label) => { const ms = toMs(n, u); if (ms !== 0 && !mo.durations.has(ms)) hits.push({ value: label, index }); };
-  for (const m of text.matchAll(CSS_MOTION_DECL)) for (const d of m[1].matchAll(DUR)) dur(d[1], d[2], m.index, d[1] + d[2]);
+  const dur = (n, u, index, label) => {
+    const ms = toMs(n, u);
+    if (ms !== 0 && !mo.durations.has(ms)) hits.push({ value: label, index });
+  };
+  for (const m of text.matchAll(CSS_MOTION_DECL))
+    for (const d of m[1].matchAll(DUR)) dur(d[1], d[2], m.index, d[1] + d[2]);
   for (const m of text.matchAll(TW_DURATION)) dur(m[1], m[2], m.index, m[1] + m[2]);
-  for (const m of text.matchAll(JS_DURATION)) { const n = num(m[1]); dur(m[1], n < 20 ? "s" : "ms", m.index, m[1] + (n < 20 ? "s" : "ms")); }
+  for (const m of text.matchAll(JS_DURATION)) {
+    const n = num(m[1]);
+    dur(m[1], n < 20 ? "s" : "ms", m.index, m[1] + (n < 20 ? "s" : "ms"));
+  }
   for (const m of text.matchAll(BEZIER)) {
     const v = normBezier(m[0]);
     if (!mo.easings.has(v)) hits.push({ value: v, index: m.index });
@@ -116,12 +150,15 @@ function scanMotion(text, mo) {
 
 function scales(sec) {
   const spacing = new Set();
-  for (const r of sec.Spacing || []) for (const c of r.slice(1)) for (const l of c.matchAll(LEN)) spacing.add(toPx(l[1], l[2]));
-  const durations = new Set(), easings = new Set();
-  for (const r of sec.Motion || []) for (const c of r.slice(1)) {
-    for (const d of c.matchAll(DUR)) durations.add(toMs(d[1], d[2]));
-    for (const b of c.matchAll(BEZIER)) easings.add(normBezier(b[0]));
-  }
+  for (const r of sec.Spacing || [])
+    for (const c of r.slice(1)) for (const l of c.matchAll(LEN)) spacing.add(toPx(l[1], l[2]));
+  const durations = new Set(),
+    easings = new Set();
+  for (const r of sec.Motion || [])
+    for (const c of r.slice(1)) {
+      for (const d of c.matchAll(DUR)) durations.add(toMs(d[1], d[2]));
+      for (const b of c.matchAll(BEZIER)) easings.add(normBezier(b[0]));
+    }
   return { spacing, motion: { durations, easings } };
 }
 
@@ -142,8 +179,21 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
   const layoutPaths = new Set((sec.Layouts || []).map((r) => r[1]));
   const pkgs = new Map((sec.Packages || []).map((r) => [r[0], r[2] || ""]));
 
-  const res = { schema: 2, new_components: [], new_layouts: [], raw_colours: [], raw_spacing: [], raw_motion: [], missing_reduced_motion: [], new_packages: [], unjustified: 0 };
-  if (all) { res.stale_inventory = []; res.near_duplicates = []; }
+  const res = {
+    schema: 2,
+    new_components: [],
+    new_layouts: [],
+    raw_colours: [],
+    raw_spacing: [],
+    raw_motion: [],
+    missing_reduced_motion: [],
+    new_packages: [],
+    unjustified: 0,
+  };
+  if (all) {
+    res.stale_inventory = [];
+    res.near_duplicates = [];
+  }
   const seenComp = new Set();
 
   for (const f of files) {
@@ -152,7 +202,11 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     const stem = base.replace(/\.[^.]+$/, "");
     if (/(^|\/)package\.json$/.test(p)) {
       let json;
-      try { json = JSON.parse(f.content); } catch (e) { throw new Error(`bad JSON in ${p}: ${e.message}`); }
+      try {
+        json = JSON.parse(f.content);
+      } catch (e) {
+        throw new Error(`bad JSON in ${p}: ${e.message}`);
+      }
       for (const sect of ["dependencies", "devDependencies"]) {
         for (const name of Object.keys(json[sect] || {})) {
           if (pkgs.has(name) || res.new_packages.some((x) => x.name === name)) continue;
@@ -210,24 +264,47 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     const paths = new Set(files.map((f) => f.path.replace(/\\/g, "/")));
     const inv = inventory?.components || [];
     for (const group of [inv, inventory?.layouts || [], inventory?.schemas || []]) {
-      for (const e of group) if (e.path && !paths.has(e.path)) res.stale_inventory.push(justify({ name: e.name, file: e.path, line: 1 }, justifications));
+      for (const e of group)
+        if (e.path && !paths.has(e.path))
+          res.stale_inventory.push(justify({ name: e.name, file: e.path, line: 1 }, justifications));
     }
-    const code = files.filter((f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path) && !isDesignDoc(f.path.replace(/\\/g, "/"))).map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
+    const code = files
+      .filter(
+        (f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path) && !isDesignDoc(f.path.replace(/\\/g, "/")),
+      )
+      .map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
     const cur = buildInventory(code, { designMd }).components;
     // Generic wrapper props say nothing about duplication; need ≥2 meaningful props.
     const GENERIC = new Set(["children", "className"]);
     const sets = new Map(cur.map((c) => [c, new Set([...propSet(c)].filter((n) => !GENERIC.has(n)))]));
     const overlap = (a, b) => {
-      const x = sets.get(a), y = sets.get(b);
+      const x = sets.get(a),
+        y = sets.get(b);
       if (x.size < 2 || y.size < 2) return false;
       return [...x].filter((n) => y.has(n)).length / Math.max(x.size, y.size) >= 0.8;
     };
     for (const c of cur) {
       const dups = cur.filter((o) => o.path !== c.path && (o.name === c.name || overlap(c, o)));
-      if (dups.length) res.near_duplicates.push(justify({ name: c.name, file: c.path, line: 1, duplicates: [...new Set(dups.map((d) => d.name))] }, justifications));
+      if (dups.length)
+        res.near_duplicates.push(
+          justify(
+            { name: c.name, file: c.path, line: 1, duplicates: [...new Set(dups.map((d) => d.name))] },
+            justifications,
+          ),
+        );
     }
   }
-  for (const k of ["new_components", "new_layouts", "raw_colours", "raw_spacing", "raw_motion", "missing_reduced_motion", "new_packages", "stale_inventory", "near_duplicates"])
+  for (const k of [
+    "new_components",
+    "new_layouts",
+    "raw_colours",
+    "raw_spacing",
+    "raw_motion",
+    "missing_reduced_motion",
+    "new_packages",
+    "stale_inventory",
+    "near_duplicates",
+  ])
     res.unjustified += (res[k] || []).filter((x) => !x.justified).length;
   return res;
 }
@@ -235,7 +312,11 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
 function parseArgs(argv) {
   const a = {};
   for (let i = 0; i < argv.length; i += 2) {
-    if (argv[i] === "--all") { a.all = true; i--; continue; }
+    if (argv[i] === "--all") {
+      a.all = true;
+      i--;
+      continue;
+    }
     if (!argv[i].startsWith("--") || argv[i + 1] === undefined) throw new Error(`bad argument ${argv[i]}`);
     a[argv[i].slice(2)] = argv[i + 1];
   }
@@ -244,31 +325,57 @@ function parseArgs(argv) {
 
 function main() {
   const a = parseArgs(process.argv.slice(2));
-  if (!a.project || !a.run) throw new Error("usage: reuse-check.mjs --project <dir> --run <runDir> [--files a,b | --all] [--base <ref>]");
-  const designPath = [a.design, join(a.project, "docs/design/DESIGN.md"), join(a.project, "DESIGN.md")].find((p) => p && existsSync(p));
+  if (!a.project || !a.run)
+    throw new Error("usage: reuse-check.mjs --project <dir> --run <runDir> [--files a,b | --all] [--base <ref>]");
+  const designPath = [a.design, join(a.project, "docs/design/DESIGN.md"), join(a.project, "DESIGN.md")].find(
+    (p) => p && existsSync(p),
+  );
   if (!designPath) throw new Error("DESIGN.md not found");
   const designMd = readFileSync(designPath, "utf8");
   if (formatOf(designMd) !== 2) throw new Error(`${designPath} is not format 2; rerun design-system init`);
   const jPath = a.justifications || join(a.run, "justifications.json");
   let justifications = {};
   if (existsSync(jPath)) {
-    try { justifications = JSON.parse(readFileSync(jPath, "utf8")); } catch (e) { throw new Error(`bad JSON in ${jPath}: ${e.message}`); }
+    try {
+      justifications = JSON.parse(readFileSync(jPath, "utf8"));
+    } catch (e) {
+      throw new Error(`bad JSON in ${jPath}: ${e.message}`);
+    }
   } else if (a.justifications) throw new Error(`cannot read ${jPath}`);
   // New files are usually untracked until committed, so the diff alone would miss them.
   const gitList = (args) => execFileSync("git", args, { cwd: a.project, encoding: "utf8" }).split("\n").filter(Boolean);
   const names = a.all
     ? listProjectFiles(a.project)
     : a.files
-    ? a.files.split(",").map((s) => s.trim()).filter(Boolean)
-    : [...new Set([...gitList(["diff", "--name-only", "--relative", "--diff-filter=d", a.base || "HEAD"]), ...gitList(["ls-files", "--others", "--exclude-standard"])])];
-  const SKIP = /(^|\/)(\.artist|node_modules|\.git|\.worktrees)\/|\.(png|jpe?g|webp|gif|ico|avif|woff2?|ttf|otf|mp4|webm|pdf|zip)$/i;
-  const files = names.filter((n) => !SKIP.test(n.replace(/\\/g, "/"))).map((n) => {
-    try { return { path: n, content: readFileSync(join(a.project, n), "utf8") }; } catch (e) { throw new Error(`cannot read ${n}: ${e.message}`); }
-  });
+      ? a.files
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [
+          ...new Set([
+            ...gitList(["diff", "--name-only", "--relative", "--diff-filter=d", a.base || "HEAD"]),
+            ...gitList(["ls-files", "--others", "--exclude-standard"]),
+          ]),
+        ];
+  const SKIP =
+    /(^|\/)(\.artist|node_modules|\.git|\.worktrees)\/|\.(png|jpe?g|webp|gif|ico|avif|woff2?|ttf|otf|mp4|webm|pdf|zip)$/i;
+  const files = names
+    .filter((n) => !SKIP.test(n.replace(/\\/g, "/")))
+    .map((n) => {
+      try {
+        return { path: n, content: readFileSync(join(a.project, n), "utf8") };
+      } catch (e) {
+        throw new Error(`cannot read ${n}: ${e.message}`);
+      }
+    });
   let inventory = null;
   const invPath = join(a.project, "docs/design/inventory.json");
   if (a.all && existsSync(invPath)) {
-    try { inventory = JSON.parse(readFileSync(invPath, "utf8")); } catch (e) { throw new Error(`bad JSON in ${invPath}: ${e.message}`); }
+    try {
+      inventory = JSON.parse(readFileSync(invPath, "utf8"));
+    } catch (e) {
+      throw new Error(`bad JSON in ${invPath}: ${e.message}`);
+    }
   }
   const result = checkReuse({ designMd, files, justifications, all: !!a.all, inventory });
   mkdirSync(a.run, { recursive: true });
@@ -277,5 +384,10 @@ function main() {
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { process.exitCode = main(); } catch (e) { console.error(`reuse-check: ${e.message}`); process.exitCode = 2; }
+  try {
+    process.exitCode = main();
+  } catch (e) {
+    console.error(`reuse-check: ${e.message}`);
+    process.exitCode = 2;
+  }
 }
