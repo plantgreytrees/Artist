@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { THRESHOLDS } from "./verify.mjs";
+import { cwvPasses } from "./verify.mjs";
 
 export const DIMENSIONS = ["Hierarchy", "Typography", "Spacing & rhythm", "Colour & contrast", "Distinctiveness", "Responsiveness", "Accessibility", "Motion"];
 
@@ -73,7 +73,7 @@ function passes(round, reuse) {
   const rep = round.report;
   const cwv = rep.cwv || {};
   if ((rep.axe?.critical || 0) + (rep.axe?.serious || 0) > 0) return false;
-  if (cwv.unstable || !(cwv.lcp_ms <= THRESHOLDS.lcp_ms) || !(cwv.cls <= THRESHOLDS.cls)) return false;
+  if (!cwvPasses(cwv)) return false;
   if (round.scores && DIMENSIONS.some((d) => !(Number(round.scores[d]) >= 4))) return false;
   return !(reuse && (reuse.unreadable || reuse.unjustified > 0));
 }
