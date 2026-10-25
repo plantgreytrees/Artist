@@ -1,0 +1,12 @@
+:root {
+  --color-action-primary: #1d6b4f;
+  --color-surface: #ffffff;
+  --space-2: 8px;
+  --motion-fast: 150ms;
+  --motion-base: 300ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+.dark {
+  --color-action-primary: #4fb98f;
+  --color-surface: #111111;
+}

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "components": [
+    { "name": "Button", "path": "src/components/Button.tsx", "props": [{ "name": "children", "type": "string", "optional": false }], "variants": {}, "tokensUsed": [], "usage": { "count": 1, "files": ["src/app/pricing/page.tsx"] }, "status": "current" },
+    { "name": "PricingCard", "path": "src/components/PricingCard.tsx", "props": [{ "name": "price", "type": "string", "optional": false }], "variants": {}, "tokensUsed": [], "usage": { "count": 0, "files": [] }, "status": "current" },
+    { "name": "OldBanner", "path": "src/components/OldBanner.tsx", "props": [], "variants": {}, "tokensUsed": [], "usage": { "count": 0, "files": [] }, "status": "current" }
+  ],
+  "layouts": [],
+  "schemas": [],
+  "packages": [],
+  "unparsed": []
+}
