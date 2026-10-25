@@ -114,6 +114,11 @@ test("a schema 3 reuse.json (with --all keys) renders the same reuse findings", 
     assert.ok(html.includes(`<h3>${h}</h3>`), h);
   for (const s of ["13px", "0.42s", "OldBanner", "PriceCard"]) assert.ok(html.includes(s), s);
   assert.ok(html.includes("Unjustified: 9"));
+  // every unjustified item counted is also listed, including component token literals
+  assert.ok(html.includes("<h3>Component token literals</h3>"));
+  assert.ok(html.includes("Chip.--chip-bg"));
+  assert.equal((html.match(/<li class="bad">/g) || []).length, 9);
+  assert.ok(!html.includes("undefined"));
 });
 
 test("a schema 1 reuse.json without the new categories still renders", () => {
@@ -122,6 +127,7 @@ test("a schema 1 reuse.json without the new categories still renders", () => {
   const html = renderReview({ rounds: [{ runDir: b, report: rep() }], outDir: b });
   assert.ok(html.includes("Reuse findings"));
   assert.ok(!html.includes("Stale inventory"));
+  assert.ok(!html.includes("Component token literals"));
 });
 
 const good = () => ({
