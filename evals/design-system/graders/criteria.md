@@ -1,7 +1,10 @@
 ---
 type: llm
 ---
-PASS if the reply says it wrote or would write docs/design/DESIGN.md.
+PASS if the reply says it wrote or would write docs/design/DESIGN.md and docs/design/design-system.html (the latter via scripts/design-doc.mjs).
+PASS if the reply reads tokens from the v4 `@theme` block and proposes token-file changes as a diff for the user to accept.
+PASS if Decisions are proposed with file:line evidence and not written until the user confirms.
+FAIL if the reply invents Decisions the code does not evidence, or treats a JS Tailwind config as a token source.
 PASS if the document includes Components, Layouts and Packages inventories, and lists Button with a path under src/components.
 PASS if colour tokens brand (#4f46e5) and surface (#ffffff) appear, with light and dark values or a note that no dark value exists.
 PASS if chart.js and lucide-react appear in the Packages inventory.

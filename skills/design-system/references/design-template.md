@@ -41,30 +41,32 @@ One set per brand, each with light and dark values for every semantic token. Add
 
 ## Type scale
 
-| name | value | use |
-| --- | --- | --- |
-| font.family.body | system-ui, sans-serif | body copy |
-| font.size.base | 16px | body |
-| font.size.h1 | 2.25rem | page title |
+The `variable` column is optional on Type scale, Spacing and Motion.
+
+| name | value | variable | use |
+| --- | --- | --- | --- |
+| font.family.body | system-ui, sans-serif | --font-body | body copy |
+| font.size.base | 16px | --text-base | body |
+| font.size.h1 | 2.25rem | --text-h1 | page title |
 
 ## Spacing
 
-| name | value | use |
-| --- | --- | --- |
-| space.1 | 4px | tight gaps |
-| space.2 | 8px | inline gaps |
-| space.4 | 16px | default padding |
-| space.8 | 32px | section gaps |
+| name | value | variable | use |
+| --- | --- | --- | --- |
+| space.1 | 4px | --spacing-1 | tight gaps |
+| space.2 | 8px | --spacing-2 | inline gaps |
+| space.4 | 16px | --spacing-4 | default padding |
+| space.8 | 32px | --spacing-8 | section gaps |
 
 ## Motion
 
 Every animation uses these tokens and has a reduced-motion fallback (`prefers-reduced-motion`, `motion-safe:` / `motion-reduce:`, `useReducedMotion`).
 
-| name | value | use |
-| --- | --- | --- |
-| motion.duration.fast | 150ms | hover and focus feedback |
-| motion.duration.base | 300ms | panels and dialogs |
-| motion.easing.standard | cubic-bezier(0.2, 0, 0, 1) | default transitions |
+| name | value | variable | use |
+| --- | --- | --- | --- |
+| motion.duration.fast | 150ms | --duration-fast | hover and focus feedback |
+| motion.duration.base | 300ms | --duration-base | panels and dialogs |
+| motion.easing.standard | cubic-bezier(0.2, 0, 0, 1) | --ease-standard | default transitions |
 
 <!-- artist:inventory:start -->
 
@@ -90,9 +92,26 @@ Every animation uses these tokens and has a reduced-motion fallback (`prefers-re
 
 <!-- artist:inventory:end -->
 
+## Component tokens
+
+Optional. Variant-bearing components may bind variables here. Every `semantic` cell names an existing Semantic, Type scale, Spacing or Motion token, never a literal.
+
+| component | variable | semantic | use |
+| --- | --- | --- | --- |
+| Button | --button-bg | color.action.primary | primary button background |
+
+## Decisions
+
+Append-only. A changed decision is a new row whose `supersedes` names the old `id`. A deprecation is a row whose `decision` is exactly `Deprecate <Name>`.
+
+| id | decision | why | date | supersedes |
+| --- | --- | --- | --- | --- |
+| D1 | Use semantic tokens in components | one place to change a value | 2026-01-01 | |
+
 ## Platform notes
 
 - dev url: http://localhost:3000
 - start: npm run dev
-- token files: src/styles/tokens.css, tailwind.config.js
+- token files: src/styles/tokens.css
+- tailwind: v4 CSS-first, theme in src/styles/tokens.css (`@theme`, semantic tokens in `@theme static`)
 - platform: web

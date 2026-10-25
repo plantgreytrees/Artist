@@ -2,15 +2,17 @@
 max_turns: 12
 allowed_tools: [Read, Write, Glob, Grep, Skill, Bash]
 ---
-Set up a design system doc for this project from its Tailwind config.
+Set up a design system doc for this project from its Tailwind v4 theme.
 
-tailwind.config.js:
+src/styles/tokens.css:
 
-```js
-module.exports = {
-  content: ["./src/**/*.{js,jsx}"],
-  theme: { extend: { colors: { brand: "#4f46e5", surface: "#ffffff" }, borderRadius: { card: "12px" } } },
-};
+```css
+@import "tailwindcss";
+@theme {
+  --color-brand: #4f46e5;
+  --color-surface: #ffffff;
+  --radius-card: 12px;
+}
 ```
 
 src/components/Button.jsx:
