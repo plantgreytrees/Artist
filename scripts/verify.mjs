@@ -80,7 +80,7 @@ export function reportPathFor(result = {}) {
 // The single CWV pass rule, shared with review-html so the page and the exit
 // code can never disagree; an unknown LCP is a miss, never a pass.
 export function cwvPasses(cwv = {}) {
-  return !cwv.unstable && typeof cwv.lcp_ms === "number" && cwv.lcp_ms <= THRESHOLDS.lcp_ms && cwv.cls <= THRESHOLDS.cls;
+  return !cwv.unstable && Number.isFinite(cwv.lcp_ms) && cwv.lcp_ms <= THRESHOLDS.lcp_ms && Number.isFinite(cwv.cls) && cwv.cls <= THRESHOLDS.cls;
 }
 
 export function exitCodeFor({ axe, cwv, error } = {}) {

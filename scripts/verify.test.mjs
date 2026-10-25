@@ -251,3 +251,12 @@ describe("browser integration", { skip: skipBrowser }, () => {
     }
   });
 });
+
+describe("cwvPasses", () => {
+  test("unknown CLS is a miss, never a pass", async () => {
+    const { cwvPasses } = await import("./verify.mjs");
+    assert.equal(cwvPasses({ lcp_ms: 900, cls: null, unstable: false }), false);
+    assert.equal(cwvPasses({ lcp_ms: 900, cls: Number.NaN, unstable: false }), false);
+    assert.equal(cwvPasses({ lcp_ms: 900, cls: 0.01, unstable: false }), true);
+  });
+});

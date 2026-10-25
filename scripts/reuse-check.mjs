@@ -214,9 +214,12 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     }
     const code = files.filter((f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path) && !isDesignDoc(f.path.replace(/\\/g, "/"))).map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
     const cur = buildInventory(code, { designMd }).components;
+    // Generic wrapper props say nothing about duplication; need ≥2 meaningful props.
+    const GENERIC = new Set(["children", "className"]);
+    const sets = new Map(cur.map((c) => [c, new Set([...propSet(c)].filter((n) => !GENERIC.has(n)))]));
     const overlap = (a, b) => {
-      const x = propSet(a), y = propSet(b);
-      if (!x.size || !y.size) return false;
+      const x = sets.get(a), y = sets.get(b);
+      if (x.size < 2 || y.size < 2) return false;
       return [...x].filter((n) => y.has(n)).length / Math.max(x.size, y.size) >= 0.8;
     };
     for (const c of cur) {

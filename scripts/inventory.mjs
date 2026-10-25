@@ -268,6 +268,10 @@ export function listProjectFiles(project) {
     execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: project, stdio: "pipe" });
     const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: project, encoding: "utf8", maxBuffer: 1 << 28 });
     names = out.split("\0").filter(Boolean);
+    // A project folder its parent repo ignores lists nothing; walk it instead.
+    let ignored = false;
+    try { execFileSync("git", ["check-ignore", "-q", "."], { cwd: project, stdio: "pipe" }); ignored = true; } catch {}
+    if (ignored || (!names.length && readdirSync(project).length)) names = null;
   } catch { names = null; }
   if (names === null) {
     names = [];

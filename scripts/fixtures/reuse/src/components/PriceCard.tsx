@@ -1,5 +1,5 @@
-type PriceCardProps = { price: string };
+type PriceCardProps = { price: string; period: string };
 
-export function PriceCard({ price }: PriceCardProps) {
-  return <div className="card">{price}</div>;
+export function PriceCard({ price, period }: PriceCardProps) {
+  return <div className="card">{price} / {period}</div>;
 }

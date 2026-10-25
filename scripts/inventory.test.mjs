@@ -189,3 +189,16 @@ test("listProjectFiles honours .gitignore in a repo and walks outside git", asyn
   (await import("node:fs")).rmSync(join(d, "src/gone.tsx"));
   assert.deepEqual(listProjectFiles(d), [".gitignore", "src/b.tsx"]);
 });
+
+test("an ignored project directory inside a parent repo is still listed", async () => {
+  const { listProjectFiles } = await import("./inventory.mjs");
+  const root = mkdtempSync(join(tmpdir(), "inv-ignored-"));
+  const git = (...a) => spawnSync("git", ["-C", root, ...a], { encoding: "utf8" });
+  git("init", "-q");
+  writeFileSync(join(root, ".gitignore"), "app/\n");
+  git("add", ".gitignore");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+  mkdirSync(join(root, "app/src/components"), { recursive: true });
+  writeFileSync(join(root, "app/src/components/X.tsx"), "export function X() { return null; }\n");
+  assert.deepEqual(listProjectFiles(join(root, "app")), ["src/components/X.tsx"]);
+});
