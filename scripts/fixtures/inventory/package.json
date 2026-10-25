@@ -1,0 +1,6 @@
+{
+  "name": "fixture-root",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "devDependencies": { "typescript": "5.5.0" }
+}
