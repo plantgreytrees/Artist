@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, existsSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -109,4 +110,77 @@ test("bad JSON exits 2", () => {
   const res = spawnSync(process.execPath, [join(here, "reuse-check.mjs"), "--project", p, "--run", out, "--files", "package.json"], { encoding: "utf8" });
   assert.equal(res.status, 2);
   assert.equal(existsSync(join(out, "reuse.json")), false);
+});
+
+const mkRepo = () => {
+  const p = mkdtempSync(join(tmpdir(), "repo-"));
+  const git = (...args) => spawnSync("git", ["-C", p, ...args], { encoding: "utf8" });
+  git("init", "-q");
+  return { p, git, commit: () => { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"); } };
+};
+const runCli = (script, project, extra = []) => {
+  const out = mkdtempSync(join(tmpdir(), "reuse-"));
+  const res = spawnSync(process.execPath, [script, "--project", project, "--run", out, ...extra], { encoding: "utf8" });
+  return { res, out };
+};
+
+test("W1: project in a monorepo subdirectory sees edited committed files", () => {
+  const { p, commit } = mkRepo();
+  const web = join(p, "mono", "web");
+  mkdirSync(join(web, "src/components"), { recursive: true });
+  writeFileSync(join(web, "DESIGN.md"), designMd);
+  writeFileSync(join(web, "src/components/Button.tsx"), "export const Button = () => null;\n");
+  commit();
+  writeFileSync(join(web, "src/components/Button.tsx"), "export const Button = () => <p style={{color:'#123456'}} />;\n");
+  const { res, out } = runCli(join(here, "reuse-check.mjs"), web);
+  assert.equal(res.status, 1, res.stderr);
+  const j = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
+  assert.ok(j.raw_colours.some((x) => x.value === "#123456"));
+});
+
+test("deleted tracked file is not an error", () => {
+  const { p, commit } = mkRepo();
+  writeFileSync(join(p, "DESIGN.md"), designMd);
+  writeFileSync(join(p, "gone.txt"), "x");
+  commit();
+  rmSync(join(p, "gone.txt"));
+  const { res } = runCli(join(here, "reuse-check.mjs"), p);
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test("unreadable listed file exits 2 naming it", () => {
+  const p = mkdtempSync(join(tmpdir(), "unread-"));
+  writeFileSync(join(p, "DESIGN.md"), designMd);
+  const { res } = runCli(join(here, "reuse-check.mjs"), p, ["--files", "nope.tsx"]);
+  assert.equal(res.status, 2);
+  assert.match(res.stderr, /nope\.tsx/);
+});
+
+test("W2: CLI through a symlinked directory still runs", () => {
+  const link = join(mkdtempSync(join(tmpdir(), "lnk-")), "scripts-link");
+  symlinkSync(here, link);
+  const { res, out } = runCli(join(link, "reuse-check.mjs"), fx, ["--files", changed.join(","), "--justifications", join(fx, "justifications.json")]);
+  assert.equal(res.status, 1, res.stderr);
+  assert.ok(existsSync(join(out, "reuse.json")));
+});
+
+test("W4: .artist/** and binary files are not scanned", () => {
+  const { p, commit } = mkRepo();
+  writeFileSync(join(p, "DESIGN.md"), designMd);
+  commit();
+  mkdirSync(join(p, ".artist/runs/x"), { recursive: true });
+  writeFileSync(join(p, ".artist/runs/x/375.png"), randomBytes(4096));
+  writeFileSync(join(p, ".artist/runs/x/review.html"), "<p style='color:#abcdef'>");
+  writeFileSync(join(p, "shot.png"), randomBytes(4096));
+  const { res, out } = runCli(join(here, "reuse-check.mjs"), p);
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(JSON.parse(readFileSync(join(out, "reuse.json"), "utf8")).raw_colours.length, 0);
+});
+
+test("S6: href anchors and var() colour functions are not colours", () => {
+  const r = checkReuse({
+    designMd,
+    files: [{ path: "src/a.css", content: 'a{color:hsl(var(--primary))}\n<a href="#feed"></a><a href=#bead></a><b id="#abc"></b>' }],
+  });
+  assert.deepEqual(r.raw_colours, []);
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Deterministic reuse check: DESIGN.md + changed files + justifications -> reuse.json
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from "node:fs";
 import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -35,7 +35,7 @@ function sections(md) {
 }
 
 const hexOf = (n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, "0");
-const COLOUR_RE = /(?<![\w&])#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])|\b(rgba?|hsla?)\(\s*([^)]*?)\s*\)/gi;
+const COLOUR_RE = /(?<![\w&])(?<!\b(?:href|id)\s*=\s*["']?)#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])|\b(rgba?|hsla?)\(\s*([^)]*?)\s*\)/gi;
 
 function normColour(m) {
   if (m[1] !== undefined) {
@@ -55,7 +55,10 @@ function normColour(m) {
 
 function colours(text) {
   const found = [];
-  for (const m of text.matchAll(COLOUR_RE)) found.push({ value: normColour(m), index: m.index });
+  for (const m of text.matchAll(COLOUR_RE)) {
+    if (m[3] !== undefined && /var\(/i.test(m[3])) continue;
+    found.push({ value: normColour(m), index: m.index });
+  }
   return found;
 }
 
@@ -156,14 +159,17 @@ function main() {
   const gitList = (args) => execFileSync("git", args, { cwd: a.project, encoding: "utf8" }).split("\n").filter(Boolean);
   const names = a.files
     ? a.files.split(",").map((s) => s.trim()).filter(Boolean)
-    : [...new Set([...gitList(["diff", "--name-only", a.base || "HEAD"]), ...gitList(["ls-files", "--others", "--exclude-standard"])])];
-  const files = names.filter((n) => existsSync(join(a.project, n))).map((n) => ({ path: n, content: readFileSync(join(a.project, n), "utf8") }));
+    : [...new Set([...gitList(["diff", "--name-only", "--relative", "--diff-filter=d", a.base || "HEAD"]), ...gitList(["ls-files", "--others", "--exclude-standard"])])];
+  const SKIP = /(^|\/)\.artist\/|\.(png|jpe?g|webp|gif|ico|avif|woff2?|ttf|otf|mp4|webm|pdf|zip)$/i;
+  const files = names.filter((n) => !SKIP.test(n.replace(/\\/g, "/"))).map((n) => {
+    try { return { path: n, content: readFileSync(join(a.project, n), "utf8") }; } catch (e) { throw new Error(`cannot read ${n}: ${e.message}`); }
+  });
   const result = checkReuse({ designMd, files, justifications });
   mkdirSync(a.run, { recursive: true });
   writeFileSync(join(a.run, "reuse.json"), JSON.stringify(result, null, 2) + "\n");
   return result.unjustified ? 1 : 0;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { process.exitCode = main(); } catch (e) { console.error(`reuse-check: ${e.message}`); process.exitCode = 2; }
 }
