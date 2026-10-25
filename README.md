@@ -22,6 +22,14 @@ Artist is a Claude Code plugin that designs, builds, measures and refines web an
 
 Reuse first: existing components, layouts, colours and installed npm packages come before anything new. Anything new, including a new dependency, needs a one-line justification and is proposed as an inventory or token addition.
 
+## Theming and white-labelling
+
+`DESIGN.md` is format 2: Primitives (palette and scales), Semantic tokens mapped to CSS variables or theme keys, and Themes with one set per brand, each with light and dark values. Components use semantic tokens only, so adding a brand means adding a theme set, never new literals. On web, switch brands with `[data-theme]` / `[data-brand]` attributes; on React Native, use one theme object per brand with `useColorScheme`. Every animation uses the Motion tokens and has a reduced-motion fallback.
+
+## Keeping the design consistent
+
+`design-system init` and `audit` run `scripts/inventory.mjs`, which regenerates the Components (props, variants), Layouts, Schemas and Packages inventory in `DESIGN.md` between the `artist:inventory` markers. `audit` also runs `reuse-check.mjs --all` and writes `docs/design/consistency.md`, grouped by category (raw colours, off-scale spacing, raw motion, missing reduced-motion fallbacks, near-duplicate components, stale inventory entries, new components and packages), each item with `file:line` and a suggested fix. A format-1 `DESIGN.md` is migrated by `init`.
+
 ## First run
 
 `verify.mjs` needs its own dependencies (Playwright and axe). When they are missing it prints the exact `npm ci --prefix ...` command to run; run it once and retry.

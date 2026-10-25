@@ -22,3 +22,5 @@ export function Button({ children }) {
 ```
 
 package.json dependencies: react 18.3.1, chart.js 4.4.0, lucide-react 0.400.0.
+
+Run `init`, then `audit`.
