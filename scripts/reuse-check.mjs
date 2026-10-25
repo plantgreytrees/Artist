@@ -225,7 +225,8 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     if (/(^|\/)DESIGN\.md$/.test(p) || /\.json$/.test(p)) continue;
 
     if (isDesignDoc(p)) continue;
-    const isLayout = /^(layout|_layout)\.[^.]+$/.test(base) || /Layout\.[^.]+$/.test(base);
+    const isLayout =
+      /^(layout|_layout)\.[^.]+$/.test(base) || /Layout\.[^.]+$/.test(base) || /(^|\/)layouts\/.+\.vue$/.test(p);
     if (isLayout) {
       if (!layoutPaths.has(p)) res.new_layouts.push(justify({ name: p, file: p, line: 1 }, justifications));
     } else if (/(^|\/)components\//.test(p) && /\.[jt]sx?$|\.vue$|\.svelte$/.test(base)) {
@@ -270,7 +271,11 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     }
     const code = files
       .filter(
-        (f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path) && !isDesignDoc(f.path.replace(/\\/g, "/")),
+        // package.json lets buildInventory spot Nuxt apps and give .vue files their Nuxt names
+        (f) =>
+          (/\.([jt]sx?|vue)$/.test(f.path) || /(^|[\\/])package\.json$/.test(f.path)) &&
+          !isTokenFile(tokFiles, f.path) &&
+          !isDesignDoc(f.path.replace(/\\/g, "/")),
       )
       .map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
     const cur = buildInventory(code, { designMd }).components;

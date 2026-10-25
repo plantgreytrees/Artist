@@ -24,13 +24,40 @@ export const END = "<!-- artist:inventory:end -->";
 
 // Capability map shared with reuse-check.mjs (imported there).
 export const CAPS = {
-  charts: ["chart.js", "react-chartjs-2", "recharts", "echarts", "apexcharts", "victory", "@nivo/*", "d3"],
-  icons: ["lucide-react", "react-icons", "@heroicons/*", "@fortawesome/*"],
-  "ui-kit": ["@mui/*", "antd", "@chakra-ui/*", "@radix-ui/*", "@headlessui/*", "@mantine/*"],
-  animation: ["framer-motion", "motion", "gsap", "react-spring"],
+  charts: [
+    "chart.js",
+    "react-chartjs-2",
+    "vue-chartjs",
+    "recharts",
+    "echarts",
+    "vue-echarts",
+    "apexcharts",
+    "vue3-apexcharts",
+    "victory",
+    "@nivo/*",
+    "d3",
+  ],
+  icons: ["lucide-react", "lucide-vue-next", "react-icons", "@heroicons/*", "@fortawesome/*", "@iconify/vue"],
+  "ui-kit": [
+    "@mui/*",
+    "antd",
+    "@chakra-ui/*",
+    "@radix-ui/*",
+    "@headlessui/*",
+    "@mantine/*",
+    "@nuxt/ui",
+    "vuetify",
+    "primevue",
+    "element-plus",
+    "naive-ui",
+    "quasar",
+    "radix-vue",
+    "reka-ui",
+  ],
+  animation: ["framer-motion", "motion", "gsap", "react-spring", "@vueuse/motion"],
   dates: ["date-fns", "dayjs", "moment", "luxon"],
-  forms: ["react-hook-form", "formik"],
-  state: ["zustand", "redux", "@reduxjs/toolkit", "jotai"],
+  forms: ["react-hook-form", "formik", "vee-validate", "@formkit/*"],
+  state: ["zustand", "redux", "@reduxjs/toolkit", "jotai", "pinia", "vuex"],
 };
 const matches = (pat, name) => (pat.endsWith("/*") ? name.startsWith(pat.slice(0, -1)) : pat === name);
 export const capOf = (name) => Object.keys(CAPS).find((c) => CAPS[c].some((p) => matches(p, name))) ?? null;
@@ -46,11 +73,14 @@ const uniqSorted = (xs) => [...new Set(xs)].sort(cmp);
 const ROUTE_FILE = /(^|\/)(layout|page|template|loading|error|not-found|route)\.(tsx|jsx|ts|js)$/;
 const isTsx = (p) => /\.(tsx|jsx)$/.test(p);
 
+// Body between the bracket at `open` ({ or [) and its match.
 function balanced(src, open) {
+  const o = src[open],
+    c = o === "[" ? "]" : "}";
   let depth = 0;
   for (let i = open; i < src.length; i++) {
-    if (src[i] === "{") depth++;
-    else if (src[i] === "}" && --depth === 0) return src.slice(open + 1, i);
+    if (src[i] === o) depth++;
+    else if (src[i] === c && --depth === 0) return src.slice(open + 1, i);
   }
   return null;
 }
@@ -97,13 +127,211 @@ function isDeprecated(content, name, designMd) {
   const m = new RegExp(
     `/\\*\\*(?:(?!\\*/)[\\s\\S])*@deprecated(?:(?!\\*/)[\\s\\S])*\\*/\\s*export\\s+(?:default\\s+)?(?:function|const|class)\\s+${name}\\b`,
   ).test(content);
-  if (m) return true;
+  return m || deprecatedInDesign(designMd, name);
+}
+
+function deprecatedInDesign(designMd, name) {
   if (!designMd) return false;
   const outside =
     designMd.includes(START) && designMd.includes(END)
       ? designMd.slice(0, designMd.indexOf(START)) + designMd.slice(designMd.indexOf(END) + END.length)
       : designMd;
   return outside.split(/\r?\n/).some((l) => /deprecated/i.test(l) && new RegExp(`\\b${name}\\b`).test(l));
+}
+
+// ---- Vue single-file components ----
+
+const pascal = (s) =>
+  s
+    .split(/[-_.\s]+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join("");
+const kebab = (s) =>
+  s
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+const scriptOf = (content) => [...content.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join("\n");
+const dirOf = (p) => (p.includes("/") ? posix.dirname(p) : "");
+
+// Where a .vue file sits in its app: Nuxt (an ancestor package.json depends on
+// nuxt) knows pages/, layouts/ and auto-imported components/; plain Vue only
+// has components, with App.vue as the root.
+function vueRole(path, nuxtRoots) {
+  const root = nuxtRoots.filter((r) => r === "" || path.startsWith(r + "/")).sort((a, b) => b.length - a.length)[0];
+  if (root === undefined) return { nuxt: false, kind: posix.basename(path) === "App.vue" ? "root" : "component" };
+  const rel = (root ? path.slice(root.length + 1) : path).replace(/^app\//, "");
+  if (rel === "app.vue" || rel === "error.vue") return { nuxt: true, root, rel, kind: "root" };
+  const kind = /^pages\//.test(rel) ? "page" : /^layouts\//.test(rel) ? "layout" : "component";
+  return { nuxt: true, root, rel, kind };
+}
+
+// Nuxt's auto-import name: folders under components/ prefix the file name,
+// minus any trailing folders the file name already starts with.
+function vueName(path, role) {
+  const base = posix.basename(path, ".vue");
+  if (!role.nuxt || !/^components\//.test(role.rel)) return pascal(base);
+  const parts = role.rel.slice("components/".length).split("/").slice(0, -1).map(pascal);
+  let file = pascal(base);
+  if (base === "index" && parts.length) file = parts.pop();
+  for (let k = parts.length; k > 0; k--) {
+    if (file.startsWith(parts.slice(-k).join(""))) return parts.slice(0, -k).join("") + file;
+  }
+  return parts.join("") + file;
+}
+
+// Top-level comma-separated entries of an object or array body, in order.
+function splitTop(body) {
+  const out = [];
+  let depth = 0,
+    start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if ("({[".includes(ch)) depth++;
+    else if (")}]".includes(ch)) depth--;
+    else if (ch === "," && depth === 0) {
+      out.push(body.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(body.slice(start));
+  return out.map((s) => s.trim()).filter(Boolean);
+}
+
+// The generic argument of defineProps<...>(), ignoring => and anything in braces.
+function genericArg(src, from) {
+  let angle = 1,
+    brace = 0;
+  for (let i = from; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === "{") brace++;
+    else if (ch === "}") brace--;
+    else if (brace === 0 && ch === "<") angle++;
+    else if (brace === 0 && ch === ">" && src[i - 1] !== "=" && --angle === 0) return src.slice(from, i);
+  }
+  return null;
+}
+
+function typeBody(content, name) {
+  const decl = new RegExp(`(?:interface\\s+${name}\\b[^{]*|type\\s+${name}\\s*=\\s*)\\{`).exec(content);
+  return decl ? balanced(content, decl.index + decl[0].length - 1) : null;
+}
+
+function runtimeProps(src, open) {
+  const body = balanced(src, open);
+  if (body == null) return null;
+  if (src[open] === "[") {
+    return [...body.matchAll(/["'`]([^"'`]+)["'`]/g)].map((m) => ({ name: m[1], type: "unknown", optional: true }));
+  }
+  const props = [];
+  for (const entry of splitTop(body)) {
+    const m = /^["']?([A-Za-z_$][\w$-]*)["']?\s*:\s*([\s\S]*)$/.exec(entry);
+    if (!m) continue;
+    const val = m[2].trim();
+    if (val.startsWith("{")) {
+      const t = /\btype\s*:\s*([^,}\n]+)/.exec(val);
+      props.push({ name: m[1], type: t ? t[1].trim() : "unknown", optional: !/\brequired\s*:\s*true\b/.test(val) });
+    } else props.push({ name: m[1], type: val, optional: true });
+  }
+  return props;
+}
+
+// Props of a .vue file: defineProps<T>() (T inline, declared in the file or
+// exported by another project file, & intersections joined), runtime
+// defineProps({...} | [...]), or an Options API `props:`. Names a props type
+// it cannot find in `missing`.
+function vueProps(script, files) {
+  const missing = [];
+  const gen = /defineProps\s*</.exec(script);
+  if (gen) {
+    const arg = genericArg(script, gen.index + gen[0].length);
+    if (arg == null) return { props: [], missing };
+    const props = [];
+    for (const part of splitTop(arg.replace(/&/g, ","))) {
+      if (part.startsWith("{")) {
+        props.push(...parseMembers(part.slice(1, -1)));
+        continue;
+      }
+      const name = /^[A-Za-z_$][\w$]*/.exec(part)?.[0];
+      if (!name) continue;
+      let body = typeBody(script, name);
+      for (const f of files) {
+        if (body != null) break;
+        if (new RegExp(`export\\s+(?:interface|type)\\s+${name}\\b`).test(f.content)) body = typeBody(f.content, name);
+      }
+      if (body == null) missing.push(name);
+      else props.push(...parseMembers(body));
+    }
+    return { props, missing };
+  }
+  const rt =
+    /defineProps\s*\(\s*([{[])/.exec(script) ??
+    (/export\s+default\b/.test(script) && /\bprops\s*:\s*([{[])/.exec(script));
+  if (rt) return { props: runtimeProps(script, rt.index + rt[0].length - 1) ?? [], missing };
+  return { props: [], missing };
+}
+
+const vueDeprecated = (content, script, name, designMd) =>
+  /^\s*<!--(?:(?!-->)[\s\S])*@deprecated/.test(content) ||
+  /\/\*\*(?:(?!\*\/)[\s\S])*@deprecated(?:(?!\*\/)[\s\S])*\*\/\s*(?:(?:const|let)\s+\w+\s*=\s*)?(?:withDefaults\s*\(\s*)?(?:defineProps|defineOptions|defineComponent|export\s+default)\b/.test(
+    script,
+  ) ||
+  deprecatedInDesign(designMd, name);
+
+// Nuxt route of a pages/ file and the layout it renders in (null for layout: false).
+function nuxtPage(role, script) {
+  const segs = role.rel
+    .slice("pages/".length)
+    .replace(/\.vue$/, "")
+    .split("/")
+    .filter((s) => !/^\(.*\)$/.test(s));
+  if (segs[segs.length - 1] === "index") segs.pop();
+  const meta = /definePageMeta\s*\(\s*\{[\s\S]*?\blayout\s*:\s*(false|["'`]([^"'`]+)["'`])/.exec(script);
+  return {
+    root: role.root,
+    route: "/" + segs.join("/"),
+    layout: !meta ? "default" : meta[1] === "false" ? null : meta[2],
+  };
+}
+
+// Each code file's opening-tag counts and .vue default imports, scanned once.
+function vueScan(fs) {
+  return fs
+    .filter((f) => /\.(vue|tsx|jsx|ts|js)$/.test(f.path))
+    .map((f) => {
+      const tags = new Map();
+      for (const m of f.content.matchAll(/<([A-Za-z][\w-]*)(?=[\s/>])/g)) tags.set(m[1], (tags.get(m[1]) ?? 0) + 1);
+      const imports = [...f.content.matchAll(/import\s+([A-Za-z_$][\w$]*)\s+from\s+["']([^"']+\.vue)["']/g)].map(
+        (m) => ({
+          binding: m[1],
+          // "./x.vue" resolves against the importer; "~/x.vue", "@/x.vue" are matched by path suffix
+          target: m[2].startsWith(".")
+            ? posix.normalize(posix.join(dirOf(f.path), m[2]))
+            : "/" + m[2].replace(/^(~~|@@|~|@)\//, ""),
+        }),
+      );
+      return { path: f.path, tags, imports };
+    });
+}
+
+// Files rendering a .vue component: by its Nuxt auto-import name (plain,
+// Lazy-prefixed, or kebab-case) or by a default-import binding of its file.
+function vueUsage(c, nuxt, scanned) {
+  const files = new Set();
+  let count = 0;
+  for (const f of scanned) {
+    if (f.path === c.path) continue;
+    const names = new Set(nuxt ? [c.name, "Lazy" + c.name] : []);
+    for (const i of f.imports) if (i.target === c.path || ("/" + c.path).endsWith(i.target)) names.add(i.binding);
+    let n = 0;
+    for (const t of names) for (const tag of new Set([t, kebab(t)])) n += f.tags.get(tag) ?? 0;
+    if (n) {
+      count += n;
+      files.add(f.path);
+    }
+  }
+  return { count, files: [...files].sort(cmp) };
 }
 
 function layoutRoutes(layoutPath, pagePaths) {
@@ -129,6 +357,23 @@ export function buildInventory(files, { designMd = "" } = {}) {
   const schemas = [];
   const pkgs = new Map();
   const pagePaths = fs.filter((f) => /(^|\/)page\.(tsx|jsx|ts|js)$/.test(f.path)).map((f) => f.path);
+  const nuxtRoots = fs
+    .filter((f) => /(^|\/)package\.json$/.test(f.path))
+    .filter((f) => {
+      try {
+        const j = JSON.parse(f.content);
+        return ["dependencies", "devDependencies"].some((k) => j[k]?.nuxt);
+      } catch {
+        return false;
+      }
+    })
+    .map((f) => dirOf(f.path));
+  const vueMeta = new Map(); // component -> rendered via Nuxt auto-import?
+  const nuxtPages = fs
+    .filter((f) => f.path.endsWith(".vue"))
+    .map((f) => [vueRole(f.path, nuxtRoots), f])
+    .filter(([r]) => r.kind === "page")
+    .map(([r, f]) => nuxtPage(r, scriptOf(f.content)));
 
   for (const f of fs) {
     const { path, content } = f;
@@ -166,9 +411,41 @@ export function buildInventory(files, { designMd = "" } = {}) {
       }
       continue;
     }
-    if (!/\.(tsx|jsx|ts|js)$/.test(path)) continue;
+    if (!/\.(tsx|jsx|ts|js|vue)$/.test(path)) continue;
 
-    if (/(^|\/)layout\.(tsx|jsx|ts|js)$/.test(path)) {
+    if (path.endsWith(".vue")) {
+      const role = vueRole(path, nuxtRoots);
+      const script = scriptOf(content);
+      if (role.kind === "layout") {
+        const name = kebab(
+          role.rel
+            .slice("layouts/".length)
+            .replace(/\.vue$/, "")
+            .split("/")
+            .map(pascal)
+            .join(""),
+        );
+        const routes = nuxtPages.filter((p) => p.root === role.root && p.layout === name).map((p) => p.route);
+        layouts.push({ name, path, routes: uniqSorted(routes) });
+      } else if (role.kind === "component") {
+        const name = vueName(path, role);
+        const { props, missing } = vueProps(script, fs);
+        for (const t of missing) unparsed.push({ path, reason: `props type ${t} not found` });
+        const variants = {};
+        for (const p of props) if (p.values) variants[p.name] = p.values;
+        const c = {
+          name,
+          path,
+          props,
+          variants,
+          tokensUsed: uniqSorted([...content.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1])),
+          usage: { count: 0, files: [] },
+          status: vueDeprecated(content, script, name, designMd) ? "deprecated" : "current",
+        };
+        components.push(c);
+        vueMeta.set(c, role.nuxt);
+      }
+    } else if (/(^|\/)layout\.(tsx|jsx|ts|js)$/.test(path)) {
       const names = exportedNames(content);
       const def = /export\s+default\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)/.exec(content);
       layouts.push({
@@ -223,7 +500,12 @@ export function buildInventory(files, { designMd = "" } = {}) {
   }
 
   // usage: files (other than the definition) importing and rendering the component
+  const scanned = vueMeta.size ? vueScan(fs) : [];
   for (const c of components) {
+    if (vueMeta.has(c)) {
+      c.usage = vueUsage(c, vueMeta.get(c), scanned);
+      continue;
+    }
     const files = new Set();
     let count = 0;
     for (const f of fs) {
@@ -412,7 +694,7 @@ export function listProjectFiles(project) {
 
 function walk(root) {
   return listProjectFiles(root)
-    .filter((rel) => /\.(tsx|jsx|ts|js|json)$/.test(rel) && rel !== "docs/design/inventory.json")
+    .filter((rel) => /\.(tsx|jsx|ts|js|vue|json)$/.test(rel) && rel !== "docs/design/inventory.json")
     .map((rel) => ({ path: rel, content: readFileSync(join(root, rel), "utf8") }));
 }
 

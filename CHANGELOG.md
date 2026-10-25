@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Design depth and white-label theming: format-2 `DESIGN.md` with a generated component, layout, schema and package inventory, semantic tokens and per-brand light/dark themes; a platform consistency audit (`docs/design/consistency.md`); and motion enforcement (motion tokens and reduced-motion fallbacks) in `create` and `optimise`.
+- Vue and Nuxt support in `inventory.mjs` and `reuse-check.mjs --all`: `.vue` components with their props, variants, tokens, usage and deprecation; Nuxt auto-import names, layouts and their page routes; and capability tags for Vue packages (Pinia, Nuxt UI, Vuetify, PrimeVue, vue-echarts, VeeValidate and others).
 
 ## [0.1.0] - 2026-10-25
 
