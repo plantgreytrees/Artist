@@ -80,6 +80,13 @@ const good = () => ({ schema: 1, url: "http://localhost:3000/", generated_at: "2
 const fours = Object.fromEntries(DIMS.map((d) => [d, 4]));
 const verdictOf = (html) => /Final verdict: <strong>([^<]+)<\/strong>/.exec(html)[1];
 
+test("unknown LCP is a miss, never a pass", () => {
+  const { b } = setup(false);
+  const r = good(); r.cwv.lcp_ms = null;
+  const html = renderReview({ rounds: [{ runDir: b, report: r, scores: Object.fromEntries(DIMS.map((d) => [d, 5])) }], outDir: b });
+  assert.equal(verdictOf(html), "NEEDS WORK");
+});
+
 test("final verdict mirrors the loop's stop condition", () => {
   const { b } = setup(false);
   const pass = renderReview({ rounds: [{ runDir: b, report: good(), scores: fours }], outDir: b });

@@ -77,11 +77,16 @@ export function reportPathFor(result = {}) {
   return fs.existsSync(file) ? file : null;
 }
 
+// The single CWV pass rule, shared with review-html so the page and the exit
+// code can never disagree; an unknown LCP is a miss, never a pass.
+export function cwvPasses(cwv = {}) {
+  return !cwv.unstable && typeof cwv.lcp_ms === "number" && cwv.lcp_ms <= THRESHOLDS.lcp_ms && cwv.cls <= THRESHOLDS.cls;
+}
+
 export function exitCodeFor({ axe, cwv, error } = {}) {
   if (error || !axe || !cwv) return 2;
   if ((axe.serious || 0) + (axe.critical || 0) > 0) return 1;
-  if (cwv.unstable || typeof cwv.lcp_ms !== "number" || !(cwv.lcp_ms <= THRESHOLDS.lcp_ms) || !(cwv.cls <= THRESHOLDS.cls)) return 1;
-  return 0;
+  return cwvPasses(cwv) ? 0 : 1;
 }
 
 // Dependencies live in ${CLAUDE_PLUGIN_DATA}/node_modules, never in the target
