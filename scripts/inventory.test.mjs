@@ -248,3 +248,215 @@ test("node_modules inside an ignored project is never listed", async () => {
   writeFileSync(join(app, "node_modules/x.js"), "x\n");
   assert.deepEqual(listProjectFiles(app), ["src/a.tsx"]);
 });
+
+// ---- Vue single-file components ----
+
+const NUXT_PKG = { path: "web/package.json", content: '{"dependencies":{"nuxt":"3","pinia":"2","@nuxt/ui":"3"}}' };
+const vueInv = async (files, opts) => (await import("./inventory.mjs")).buildInventory([NUXT_PKG, ...files], opts);
+const comp = (inv, name) => inv.components.find((c) => c.name === name);
+
+test("Vue: type-based defineProps with withDefaults, Nuxt path-prefixed name, tokens", async () => {
+  const inv = await vueInv([
+    {
+      path: "web/components/shared/SectionCard.vue",
+      content: `<script setup lang="ts">
+interface Props {
+  title?: string
+  accent?: 'none' | 'brand' | 'warn'
+  count: number
+}
+const props = withDefaults(defineProps<Props>(), { accent: 'none' })
+</script>
+<template><section :title="title">{{ count }}</section></template>
+<style scoped>section { color: var(--fg-default); padding: var(--space-2); }</style>
+`,
+    },
+  ]);
+  const c = comp(inv, "SharedSectionCard");
+  assert.ok(c, JSON.stringify(inv.components));
+  assert.equal(c.path, "web/components/shared/SectionCard.vue");
+  assert.deepEqual(
+    c.props.map((p) => p.name + (p.optional ? "?" : "")),
+    ["title?", "accent?", "count"],
+  );
+  assert.deepEqual(c.variants, { accent: ["none", "brand", "warn"] });
+  assert.deepEqual(c.tokensUsed, ["--fg-default", "--space-2"]);
+  assert.equal(c.status, "current");
+});
+
+test("Vue: Nuxt drops a prefix the file name repeats, and names index.vue after its folder", async () => {
+  const inv = await vueInv([
+    { path: "web/components/shared/SharedBadge.vue", content: "<template><span/></template>" },
+    { path: "web/components/base/foo-bar.vue", content: "<template><span/></template>" },
+    { path: "web/components/menu/index.vue", content: "<template><nav/></template>" },
+  ]);
+  assert.deepEqual(inv.components.map((c) => c.name).sort(), ["BaseFooBar", "Menu", "SharedBadge"]);
+});
+
+test("Vue: inline, runtime-object, array and Options API props", async () => {
+  const inv = await vueInv([
+    {
+      path: "web/components/Inline.vue",
+      content: `<script setup lang="ts">\ndefineProps<{ label: string; size?: 'sm' | 'lg' }>()\n</script>`,
+    },
+    {
+      path: "web/components/Runtime.vue",
+      content: `<script setup>\ndefineProps({\n  label: { type: String, required: true },\n  size: { type: String, default: 'sm' },\n  open: Boolean,\n})\n</script>`,
+    },
+    { path: "web/components/Listed.vue", content: `<script setup>\ndefineProps(['a', "b"])\n</script>` },
+    {
+      path: "web/components/Legacy.vue",
+      content: `<script>\nexport default {\n  props: { value: { type: Number, required: true }, hint: String },\n  data() { return {} },\n}\n</script>`,
+    },
+  ]);
+  const sig = (n) => comp(inv, n).props.map((p) => `${p.name}${p.optional ? "?" : ""}:${p.type}`);
+  assert.deepEqual(sig("Inline"), ["label:string", "size?:'sm' | 'lg'"]);
+  assert.deepEqual(comp(inv, "Inline").variants, { size: ["sm", "lg"] });
+  assert.deepEqual(sig("Runtime"), ["label:String", "size?:String", "open?:Boolean"]);
+  assert.deepEqual(sig("Listed"), ["a?:unknown", "b?:unknown"]);
+  assert.deepEqual(sig("Legacy"), ["value:Number", "hint?:String"]);
+});
+
+test("Vue: a props type from another file and intersections are resolved", async () => {
+  const inv = await vueInv([
+    {
+      path: "web/types/schema.ts",
+      content: "export interface RendererProps {\n  nodes: string[]\n  dense?: boolean\n}\n",
+    },
+    {
+      path: "web/components/Erd.vue",
+      content: `<script setup lang="ts">\nimport type { RendererProps } from '~/types/schema'\nwithDefaults(defineProps<RendererProps & { variant?: 'a' | 'b' }>(), {})\n</script>`,
+    },
+    {
+      path: "web/components/Ghost.vue",
+      content: `<script setup lang="ts">\nimport type { MissingProps } from 'somewhere'\ndefineProps<MissingProps>()\n</script>`,
+    },
+  ]);
+  assert.deepEqual(
+    comp(inv, "Erd").props.map((p) => p.name),
+    ["nodes", "dense", "variant"],
+  );
+  assert.deepEqual(comp(inv, "Ghost").props, []);
+  assert.ok(inv.unparsed.some((u) => u.path === "web/components/Ghost.vue" && /MissingProps/.test(u.reason)));
+});
+
+test("Vue: usage counts Nuxt auto-imported tags (Pascal, kebab, Lazy) and explicit imports", async () => {
+  const inv = await vueInv([
+    { path: "web/components/shared/PageHeader.vue", content: "<template><h1/></template>" },
+    { path: "web/components/dashboard/overview/OverviewBoard.vue", content: "<template><div/></template>" },
+    {
+      path: "web/pages/index.vue",
+      content: `<script setup lang="ts">\nimport OverviewBoard from '~/components/dashboard/overview/OverviewBoard.vue'\n</script>\n<template>\n  <SharedPageHeader title="x" />\n  <shared-page-header/>\n  <LazySharedPageHeader>\n  </LazySharedPageHeader>\n  <SharedPageHeaderTitle />\n  <OverviewBoard/>\n</template>`,
+    },
+  ]);
+  assert.deepEqual(comp(inv, "SharedPageHeader").usage, { count: 3, files: ["web/pages/index.vue"] });
+  assert.deepEqual(comp(inv, "DashboardOverviewBoard").usage, { count: 1, files: ["web/pages/index.vue"] });
+});
+
+test("Vue: an aliased import resolves in a Nuxt app at the project root", async () => {
+  const { buildInventory } = await import("./inventory.mjs");
+  const inv = buildInventory([
+    { path: "package.json", content: '{"dependencies":{"nuxt":"3"}}' },
+    { path: "components/overview/OverviewBoard.vue", content: "<template><div/></template>" },
+    {
+      path: "components/Stage.vue",
+      content:
+        "<script setup>\nimport Board from '~/components/overview/OverviewBoard.vue'\n</script>\n<template>\n  <Board\n    dense\n  />\n</template>",
+    },
+  ]);
+  assert.deepEqual(comp(inv, "OverviewBoard").usage, { count: 1, files: ["components/Stage.vue"] });
+});
+
+test("Vue: pages and app.vue are not components; Nuxt layouts list their routes", async () => {
+  const inv = await vueInv([
+    { path: "web/app.vue", content: "<template><NuxtLayout><NuxtPage/></NuxtLayout></template>" },
+    { path: "web/layouts/default.vue", content: "<template><slot/></template>" },
+    { path: "web/layouts/auth.vue", content: "<template><slot/></template>" },
+    { path: "web/pages/index.vue", content: "<template><div/></template>" },
+    {
+      path: "web/pages/admin/[id].vue",
+      content: `<script setup>\ndefinePageMeta({ layout: 'default', middleware: 'role' })\n</script>`,
+    },
+    { path: "web/pages/auth/login.vue", content: `<script setup>\ndefinePageMeta({ layout: 'auth' })\n</script>` },
+    { path: "web/pages/embed.vue", content: `<script setup>\ndefinePageMeta({ layout: false })\n</script>` },
+  ]);
+  assert.deepEqual(inv.components, []);
+  assert.deepEqual(
+    inv.layouts.map((l) => [l.name, l.path, l.routes]),
+    [
+      ["auth", "web/layouts/auth.vue", ["/auth/login"]],
+      ["default", "web/layouts/default.vue", ["/", "/admin/[id]"]],
+    ],
+  );
+});
+
+test("Vue: deprecated by a leading comment or by DESIGN.md, not by a deprecated prop", async () => {
+  const inv = await vueInv(
+    [
+      { path: "web/components/OldPill.vue", content: "<!-- @deprecated use Badge -->\n<template><span/></template>" },
+      {
+        path: "web/components/OldTag.vue",
+        content: '<script setup lang="ts">\n/** @deprecated */\ndefineProps<{ a: string }>()\n</script>',
+      },
+      { path: "web/components/Chip.vue", content: "<template><span/></template>" },
+      {
+        path: "web/components/Fine.vue",
+        content: '<script setup lang="ts">\ndefineProps<{\n  /** @deprecated */\n  a?: string\n}>()\n</script>',
+      },
+    ],
+    { designMd: "Chip is deprecated; use Badge.\n" },
+  );
+  assert.deepEqual(
+    inv.components.map((c) => [c.name, c.status]),
+    [
+      ["Chip", "deprecated"],
+      ["Fine", "current"],
+      ["OldPill", "deprecated"],
+      ["OldTag", "deprecated"],
+    ],
+  );
+});
+
+test("Vue outside Nuxt: names are file names, usage needs an import", async () => {
+  const { buildInventory } = await import("./inventory.mjs");
+  const inv = buildInventory([
+    { path: "package.json", content: '{"dependencies":{"vue":"3"}}' },
+    {
+      path: "src/App.vue",
+      content:
+        "<script setup>\nimport TheButton from './components/ui/TheButton.vue'\n</script>\n<template><TheButton/><Other/></template>",
+    },
+    { path: "src/components/ui/TheButton.vue", content: "<template><button/></template>" },
+    { path: "src/components/ui/Other.vue", content: "<template><i/></template>" },
+  ]);
+  assert.deepEqual(
+    inv.components.map((c) => [c.name, c.usage.count]),
+    [
+      ["Other", 0],
+      ["TheButton", 1],
+    ],
+  );
+});
+
+test("Vue ecosystem packages get capability tags", async () => {
+  const { capOf } = await import("./inventory.mjs");
+  assert.equal(capOf("pinia"), "state");
+  assert.equal(capOf("@nuxt/ui"), "ui-kit");
+  assert.equal(capOf("vue-echarts"), "charts");
+  assert.equal(capOf("lucide-vue-next"), "icons");
+  assert.equal(capOf("vee-validate"), "forms");
+  assert.equal(capOf("@vueuse/motion"), "animation");
+});
+
+test("CLI picks up .vue files", () => {
+  const dir = copy();
+  mkdirSync(join(dir, "apps/web/src/components/vue"), { recursive: true });
+  writeFileSync(
+    join(dir, "apps/web/src/components/vue/Tile.vue"),
+    '<script setup lang="ts">\ndefineProps<{ label: string }>()\n</script>\n',
+  );
+  const r = run(dir);
+  assert.equal(r.status, 0, r.stderr);
+  const inv = JSON.parse(readFileSync(join(dir, "docs/design/inventory.json"), "utf8"));
+  assert.ok(inv.components.some((c) => c.name === "Tile" && c.path === "apps/web/src/components/vue/Tile.vue"));
+});

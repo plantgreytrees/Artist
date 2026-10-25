@@ -30,6 +30,10 @@ Reuse first: existing components, layouts, colours and installed npm packages co
 
 `design-system init` and `audit` run `scripts/inventory.mjs`, which regenerates the Components (props, variants), Layouts, Schemas and Packages inventory in `DESIGN.md` between the `artist:inventory` markers. `audit` also runs `reuse-check.mjs --all` and writes `docs/design/consistency.md`, grouped by category (raw colours, off-scale spacing, raw motion, missing reduced-motion fallbacks, near-duplicate components, stale inventory entries, new components and packages), each item with `file:line` and a suggested fix. A format-1 `DESIGN.md` is migrated by `init`.
 
+### Vue and Nuxt
+
+The inventory reads `.vue` single-file components as well as React files. Props come from `defineProps<T>()` (inline, a local `interface`/`type`, or a type exported by another project file, `&` intersections included), runtime `defineProps({...})` / `defineProps([...])`, or an Options API `props:`. In a Nuxt app (a `package.json` that depends on `nuxt`), components get their auto-import names (`components/shared/SectionCard.vue` is `SharedSectionCard`), usage counts `<SharedSectionCard>`, `<shared-section-card>` and `<LazySharedSectionCard>` as well as explicit `.vue` imports, `layouts/*.vue` are layouts listing the `pages/` routes that use them through `definePageMeta({ layout })`, and `pages/`, `app.vue` and `error.vue` are not components. A component file is deprecated when it opens with an `<!-- @deprecated -->` comment or puts `/** @deprecated */` on its `defineProps`, `defineOptions` or `export default`. Components rendered only through `<component :is>` count as unused.
+
 ## First run
 
 `verify.mjs` needs its own dependencies (Playwright and axe). When they are missing it prints the exact `npm ci --prefix ...` command to run; run it once and retry.

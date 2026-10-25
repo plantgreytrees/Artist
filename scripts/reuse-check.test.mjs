@@ -524,3 +524,28 @@ test("components sharing a single meaningful prop are not near-duplicates", () =
   const r = checkReuse({ designMd, files, all: true, inventory: { components: [], layouts: [], schemas: [] } });
   assert.deepEqual(r.near_duplicates, []);
 });
+
+test("--all finds near-duplicate Vue components under their Nuxt names", () => {
+  const sfc = '<script setup lang="ts">\ndefineProps<{ title: string; price: string; cta?: string }>()\n</script>\n';
+  const files = [
+    { path: "package.json", content: '{"dependencies":{"nuxt":"3"}}' },
+    { path: "components/pricing/Card.vue", content: sfc },
+    { path: "components/shop/PriceTile.vue", content: sfc },
+  ];
+  const r = checkReuse({ designMd, files, all: true, inventory: { components: [], layouts: [], schemas: [] } });
+  assert.deepEqual(
+    r.near_duplicates.map((d) => [d.name, [].concat(d.duplicates)]),
+    [
+      ["PricingCard", ["ShopPriceTile"]],
+      ["ShopPriceTile", ["PricingCard"]],
+    ],
+  );
+});
+
+test("a Nuxt layouts/*.vue file missing from DESIGN.md is a new layout", () => {
+  const r = one("layouts/marketing.vue", "<template><slot/></template>\n");
+  assert.deepEqual(
+    r.new_layouts.map((x) => x.name),
+    ["layouts/marketing.vue"],
+  );
+});
