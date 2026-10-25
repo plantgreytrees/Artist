@@ -76,7 +76,8 @@ export function parseTables(body) {
       continue;
     }
     if (!isRow(line) || i + 1 >= lines.length || !isDelimiter(lines[i + 1])) continue;
-    const headers = splitRow(line);
+    // Header keys are lowercased, so `| Name | Value |` reads like the template's `| name | value |`.
+    const headers = splitRow(line).map((h) => h.toLowerCase());
     const rows = [];
     i += 2;
     for (; i < lines.length && isRow(lines[i]); i++) {
@@ -187,6 +188,9 @@ export function tokenFilesOf(md) {
   }
   return out;
 }
+
+// True when a project-relative path is a declared token file or sits under a declared `dir/`.
+export const isTokenFile = (list, p) => list.some((t) => (t.endsWith("/") ? p.startsWith(t) : p === t));
 
 // Tailwind v4 `--spacing` base in px, read from token-file text (default 0.25rem, 1rem = 16px).
 export function spacingBaseOf(texts) {

@@ -14,6 +14,7 @@ import {
   bindTokens,
   categoryOf,
   spacingBaseOf,
+  isTokenFile,
   tokenFilesOf,
 } from "./design-md.mjs";
 
@@ -159,4 +160,15 @@ test("tokenFilesOf reads every Platform notes spelling of the token files line",
   assert.deepEqual(tokenFilesOf("- **token files**: `src/a.css`\n- theme files: src/themes/\n"), ["src/a.css", "src/themes/"]);
   assert.deepEqual(tokenFilesOf("- Token file: a.css, a.css\n"), ["a.css"]);
   assert.deepEqual(tokenFilesOf("no such line\n"), []);
+});
+
+test("parseTables lowercases header keys so capitalised tables read like the template", () => {
+  const rows = tableOf("## Spacing\n| Name | Value | Use |\n|---|---|---|\n| space.1 | 4px | tight |\n", "Spacing");
+  assert.deepEqual(rows, [{ name: "space.1", value: "4px", use: "tight" }]);
+});
+
+test("isTokenFile matches exact files and trailing-slash directories", () => {
+  assert.equal(isTokenFile(["a.css", "src/themes/"], "a.css"), true);
+  assert.equal(isTokenFile(["a.css", "src/themes/"], "src/themes/x.css"), true);
+  assert.equal(isTokenFile(["a.css", "src/themes/"], "src/themesx.css"), false);
 });

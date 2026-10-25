@@ -102,8 +102,18 @@ export function resolveClass(cls, ctx = {}) {
   );
 }
 
-export const STRING_LIT = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
+const STRING_LIT = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
 const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
+
+// Candidate utility classes: whitespace-separated words inside string literals, with the
+// literal's index. Words over 120 characters are skipped.
+export function* classesIn(content) {
+  for (const m of content.matchAll(STRING_LIT)) {
+    for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+      if (cls && cls.length <= 120) yield { cls, index: m.index };
+    }
+  }
+}
 
 // Bound variables a source file references (ARCH-VERIFY-23): CSS var(), Tailwind v4 utilities
 // resolved to tokens, and React Native member chains ending in a Semantic token name.
@@ -112,12 +122,9 @@ export function tokenRefsIn(content, ctx = {}) {
   for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
   const tokens = ctx.tokens ?? [];
   if (!tokens.length) return out;
-  for (const m of content.matchAll(STRING_LIT)) {
-    for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
-      if (!cls || cls.length > 120) continue;
-      const r = resolveClass(cls, ctx);
-      if (r.kind === "token") for (const v of r.variables) out.add(v);
-    }
+  for (const { cls } of classesIn(content)) {
+    const r = resolveClass(cls, ctx);
+    if (r.kind === "token") for (const v of r.variables) out.add(v);
   }
   const semantic = tokens.filter((t) => t.kind === "semantic");
   for (const m of content.matchAll(RN_ROOT)) {
