@@ -23,7 +23,7 @@ coverage:
 units:
   - id: 1
     scope_id: scaffold
-    project: artist
+    project: "."
     depends_on: []
     module: plugin manifests + script deps
     language: json
@@ -36,7 +36,7 @@ units:
     tooling: { implementer: implementer, gates: [dependency-auditor], skills: [], guards: [secrets-scan], mcp: [] }
   - id: 2
     scope_id: verify-tests
-    project: artist
+    project: "."
     depends_on: [scaffold]
     module: scripts (tests first)
     language: javascript (node ESM)
@@ -49,7 +49,7 @@ units:
     tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [], mcp: [] }
   - id: 3
     scope_id: verify-impl
-    project: artist
+    project: "."
     depends_on: [verify-tests]
     module: scripts/verify.mjs
     language: javascript (node ESM)
@@ -62,7 +62,7 @@ units:
     tooling: { implementer: implementer, gates: [security-auditor, performance-reviewer], skills: [test-driven-development, systematic-debugging], guards: [], mcp: [] }
   - id: 4
     scope_id: review-html
-    project: artist
+    project: "."
     depends_on: [verify-tests]
     module: scripts/review-html.mjs
     language: javascript (node ESM)
@@ -75,7 +75,7 @@ units:
     tooling: { implementer: implementer, gates: [ui-ux-reviewer], skills: [test-driven-development], guards: [], mcp: [] }
   - id: 10
     scope_id: reuse-check
-    project: artist
+    project: "."
     depends_on: [scaffold]
     module: scripts/reuse-check.mjs
     language: javascript (node ESM)
@@ -88,7 +88,7 @@ units:
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
   - id: 5
     scope_id: skills-core
-    project: artist
+    project: "."
     depends_on: [verify-impl, reuse-check]
     module: skills/design-system, skills/verify, skills/optimise
     language: markdown
@@ -101,7 +101,7 @@ units:
     tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
   - id: 6
     scope_id: skill-create
-    project: artist
+    project: "."
     depends_on: [verify-impl, review-html, reuse-check]
     module: skills/create + agents/design-critic
     language: markdown
@@ -114,7 +114,7 @@ units:
     tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
   - id: 7
     scope_id: evals-readme
-    project: artist
+    project: "."
     depends_on: [skills-core, skill-create]
     module: evals + README
     language: markdown/json
@@ -140,8 +140,8 @@ units:
     tooling: { implementer: implementer, gates: [], skills: [], guards: [doc-size-policy], mcp: [] }
   - id: 9
     scope_id: integration
-    project: artist
-    depends_on: [scaffold, verify-impl, review-html, reuse-check, skills-core, skill-create, evals-readme, craftsman-seam]
+    project: "."
+    depends_on: [scaffold, verify-impl, review-html, reuse-check, skills-core, skill-create, evals-readme]
     module: whole plugin
     language: mixed
     security: normal
