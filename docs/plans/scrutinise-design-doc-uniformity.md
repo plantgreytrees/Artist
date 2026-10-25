@@ -7,7 +7,7 @@ children: []
 priority: P1
 idea: docs/ideas/design-doc-uniformity.md
 classification: in-scope (fixes to merged design-doc-uniformity units; no decided rule changes)
-tracker_rows: [scrutinise-design-doc-uniformity#design-doc-hardening, scrutinise-design-doc-uniformity#reuse-check-design-md, scrutinise-design-doc-uniformity#review-html-literals]
+tracker_rows: [scrutinise-design-doc-uniformity#design-doc-hardening, scrutinise-design-doc-uniformity#reuse-check-design-md, scrutinise-design-doc-uniformity#review-html-literals, scrutinise-design-doc-uniformity#design-doc-confine, scrutinise-design-doc-uniformity#audit-paths-shared]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -62,6 +62,32 @@ units:
       write: [scripts/review-html.mjs, scripts/review-html.test.mjs]
     arch: [ARCH-VERIFY-17, ARCH-VERIFY-22]
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 4
+    scope_id: design-doc-confine
+    project: "."
+    depends_on: []
+    module: scripts/design-doc.mjs
+    language: javascript (node ESM)
+    security: high
+    scope:
+      read: [scripts/design-doc.mjs, scripts/design-doc.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/design-doc.mjs, scripts/design-doc.test.mjs]
+    arch: [ARCH-VERIFY-24, ARCH-PLUGIN-37]
+    tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
+  - id: 5
+    scope_id: audit-paths-shared
+    project: "."
+    depends_on: []
+    module: scripts/reuse-check.mjs + design-md/token-refs/inventory
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/design-md.mjs, scripts/design-md.test.mjs, scripts/token-refs.mjs, scripts/token-refs.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/design-md.mjs, scripts/design-md.test.mjs, scripts/token-refs.mjs, scripts/token-refs.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
+    arch: [ARCH-PLUGIN-36, ARCH-VERIFY-22, ARCH-VERIFY-23, ARCH-VERIFY-25, ARCH-VERIFY-26]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
 ---
 
 # Plan: scrutinise-design-doc-uniformity — round 1 fixes
@@ -71,6 +97,7 @@ Close the /scrutinise round 1 findings on design-doc-uniformity (main at 1c5a5eb
 
 ## Rolling summary
 - Round 1 (isolated scrutineer, ranges ebc68cc, 691a55f, 6435189, 5dba627, 92d0650, d50633f, 1d268e4, 1c5a5eb): Warnings in design-doc.mjs (inventory props, `--check` after audit, manifest path trust) and reuse-check.mjs (own DESIGN.md parser, ARCH-VERIFY-25). Suggestions grouped into the same units.
+- Round 2 (isolated scrutineer, ranges 1a6d1ae, 192cf50, a41a4b0 on a41a4b0): 0 Critical, 2 Warning, 5 Suggestion; 29/29 criteria MET; none disputed. Round 1 findings closed. New: reuse-check `--run` resolves against cwd while design-doc `--reuse` resolves against `--project` (introduced by 1.2); `lstat` rejects in-project symlinked inputs in write mode.
 
 ## Step 1 — design-doc-hardening (., javascript, high)
 Tooling: implementer · gate security-auditor · TDD
@@ -93,8 +120,20 @@ Tooling: implementer · TDD
 Tooling: implementer · TDD
 - [ ] 3.1 [Suggestion][Cross-unit] `scripts/review-html.mjs:64-74` add `["Component token literals", "component_token_literals"]`, shown only when the key is present, so the listed unjustified items match the count → accept: `scripts/review-html.test.mjs` schema-3 test lists the literal item and default-mode output is unchanged
 
+## Step 4 — design-doc-confine (., javascript, high) — round 2
+Tooling: implementer · gate security-auditor · TDD
+- [ ] 4.1 [Warning] `scripts/design-doc.mjs:241` `lstatSync(...).isFile()` rejects any symlinked input, even inside the project, in write mode too. Use `statSync` (follows the link) and keep the realpath containment check (`:242-244`); message `input is not a regular file` (mode-neutral) → accept: test where `docs/design/DESIGN.md` is a symlink to an in-project file renders and `--check` exits 0; escaping symlink still exits 2
+- [ ] 4.2 [Suggestion][Security] `:319-320` confine the write: `realpathSync(dirname(out))` inside `realpathSync(project)` and `out` not a symlink, else exit 2 without writing → accept: tests for a `docs/design` symlink to outside and a `design-system.html` symlink each exit 2 and leave the target untouched
+
+## Step 5 — audit-paths-shared (., javascript, normal) — round 2
+Tooling: implementer · TDD
+- [ ] 5.1 [Warning][Cross-unit] `scripts/reuse-check.mjs:474-475` resolve a relative `--run` against `--project` (as design-doc `--reuse` now does), so SKILL.md audit steps 2 and 4 agree from any cwd (ARCH-PLUGIN-36) → accept: CLI test run from another cwd writes `<project>/.artist/audit/reuse.json`
+- [ ] 5.2 [Suggestion] `scripts/design-md.mjs:79` lowercase (trim) table header keys in `parseTables`, so `| Name | Value |` tables read like the template → accept: design-md test with capitalised headers; reuse-check reads a capitalised Spacing table
+- [ ] 5.3 [Suggestion][Security] `scripts/token-refs.mjs:105` replace the exported global `/g` `STRING_LIT` with a shared `classesIn(content)` generator (yields `{cls, index}` with the length guard) used by `tokenRefsIn` and reuse-check's `off_token_classes` loop (`:258-267`) → accept: no exported RegExp; token-refs test for `classesIn`; reuse-check tests pass unchanged in intent
+- [ ] 5.4 [Suggestion][Cross-unit] expand `tokenFilesOf` directory entries the same way in inventory (`scripts/inventory.mjs:715-719`) as reuse-check does, so `--spacing` under a listed directory gives the same base in both (ARCH-VERIFY-26) → accept: inventory test with `token files: src/themes/` and a custom `--spacing` resolves `p-2` to the same token reuse-check counts
+
 ## Sequencing
-All three units are independent. Whole-plan: `node --test scripts/*.test.mjs` exits 0 on the merged result. No CHANGELOG task: the `[Unreleased]` design-depth bullet already covers this unreleased feature.
+All units are independent. Whole-plan: `node --test scripts/*.test.mjs` exits 0 on the merged result. No CHANGELOG task: the `[Unreleased]` design-depth bullet already covers this unreleased feature.
 
 ## Verification background
 CONSUMERS:
