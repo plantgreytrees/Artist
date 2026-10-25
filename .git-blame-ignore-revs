@@ -1,0 +1,7 @@
+# Formatting-only commits for `git blame` to skip.
+# Enable locally: git config blame.ignoreRevsFile .git-blame-ignore-revs (GitHub reads it automatically).
+
+# style(scripts): one-time prettier pass at printWidth 120
+678ac9f12c53548a3640abc79982547a05649757
+# style(lint): format eslint.config.mjs at printWidth 120
+bb0914e72b00c45a35a333388f463a52c6df4f7d
