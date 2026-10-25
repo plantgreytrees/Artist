@@ -9,7 +9,8 @@ Load this for web stacks. Reuse first: check the DESIGN.md Components, Layouts a
 - Use `next/link` for navigation and semantic landmarks (`header`, `nav`, `main`, `footer`).
 
 ## Tailwind
-- Map each DESIGN.md semantic token to a CSS variable and to the Tailwind theme: `colors: { action: { primary: "var(--color-action-primary)" } }`. Use token classes, not raw hex values or arbitrary `[...]` values.
+- Tailwind v4 CSS-first only. Declare each DESIGN.md semantic token as a CSS variable in an `@theme` block of the token file (`--color-action-primary`); keep semantic tokens in `@theme static` so aliased variables are always emitted, and use `@theme inline` for values that reference other variables. A JS config is unsupported and not parsed.
+- Use token classes (`bg-action-primary`) or the variable shorthand `bg-(--color-action-primary)`, not raw hex values or arbitrary `[...]` values.
 - Switch brands and light/dark by attribute sets that redefine the variables, for example `[data-theme="dark"]` and `[data-brand="acme"]` blocks in the token file. Components never change; only the variable values do.
 - A needed one-off value is proposed as a token, not hard-coded.
 - Use responsive prefixes for the verified widths (375, 768, 1280); design mobile-first.
