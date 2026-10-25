@@ -4,20 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from
 import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
-import { buildInventory } from "./inventory.mjs";
-
-const CAPS = {
-  charts: ["chart.js", "react-chartjs-2", "recharts", "echarts", "apexcharts", "victory", "@nivo/*", "d3"],
-  icons: ["lucide-react", "react-icons", "@heroicons/*", "@fortawesome/*"],
-  "ui-kit": ["@mui/*", "antd", "@chakra-ui/*", "@radix-ui/*", "@headlessui/*", "@mantine/*"],
-  animation: ["framer-motion", "motion", "gsap", "react-spring"],
-  dates: ["date-fns", "dayjs", "moment", "luxon"],
-  forms: ["react-hook-form", "formik"],
-  state: ["zustand", "redux", "@reduxjs/toolkit", "jotai"],
-};
-
-const matches = (pat, name) => (pat.endsWith("/*") ? name.startsWith(pat.slice(0, -1)) : pat === name);
-const capOf = (name) => Object.keys(CAPS).find((c) => CAPS[c].some((p) => matches(p, name)));
+import { buildInventory, capOf, formatOf, listProjectFiles } from "./inventory.mjs";
 
 function sections(md) {
   const out = {};
@@ -138,13 +125,10 @@ function scales(sec) {
   return { spacing, motion: { durations, easings } };
 }
 
-function formatOf(md) {
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
-  const f = fm && /^format:\s*(\d+)\s*$/m.exec(fm[1]);
-  return f ? Number(f[1]) : 1;
-}
-
 const propSet = (c) => new Set((c.props || []).map((p) => p.name));
+
+const SCAN_EXT = /\.(js|jsx|ts|tsx|mjs|cjs|css|scss|sass|less|vue|svelte|html)$/i;
+const isDesignDoc = (p) => /(^|\/)docs\/design\//.test(p);
 
 const ROUTE_FILES = /^(page|layout|template|loading|error|not-found|route|default|_layout|_app|_document|index)\./;
 
@@ -186,6 +170,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     }
     if (/(^|\/)DESIGN\.md$/.test(p) || /\.json$/.test(p)) continue;
 
+    if (isDesignDoc(p)) continue;
     const isLayout = /^(layout|_layout)\.[^.]+$/.test(base) || /Layout\.[^.]+$/.test(base);
     if (isLayout) {
       if (!layoutPaths.has(p)) res.new_layouts.push(justify({ name: p, file: p, line: 1 }, justifications));
@@ -203,7 +188,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
       }
     }
 
-    if (isTokenFile(tokFiles, p)) continue;
+    if (isTokenFile(tokFiles, p) || !SCAN_EXT.test(p)) continue;
     const seen = new Set();
     const report = (list, hits, key) => {
       for (const h of hits) {
@@ -227,19 +212,16 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     for (const group of [inv, inventory?.layouts || [], inventory?.schemas || []]) {
       for (const e of group) if (e.path && !paths.has(e.path)) res.stale_inventory.push(justify({ name: e.name, file: e.path, line: 1 }, justifications));
     }
-    const code = files.filter((f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path)).map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
+    const code = files.filter((f) => /\.[jt]sx?$/.test(f.path) && !isTokenFile(tokFiles, f.path) && !isDesignDoc(f.path.replace(/\\/g, "/"))).map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
     const cur = buildInventory(code, { designMd }).components;
+    const overlap = (a, b) => {
+      const x = propSet(a), y = propSet(b);
+      if (!x.size || !y.size) return false;
+      return [...x].filter((n) => y.has(n)).length / Math.max(x.size, y.size) >= 0.8;
+    };
     for (const c of cur) {
-      if (inv.some((i) => i.path === c.path && i.name === c.name)) continue; // already inventoried
-      const mine = propSet(c);
-      const dups = inv.filter((i) => {
-        if (i.path === c.path) return false;
-        if (i.name === c.name) return true;
-        const theirs = propSet(i);
-        if (!mine.size || !theirs.size) return false;
-        return [...theirs].filter((x) => mine.has(x)).length / theirs.size >= 0.8;
-      });
-      if (dups.length) res.near_duplicates.push(justify({ name: c.name, file: c.path, line: 1, duplicates: dups.map((d) => d.name) }, justifications));
+      const dups = cur.filter((o) => o.path !== c.path && (o.name === c.name || overlap(c, o)));
+      if (dups.length) res.near_duplicates.push(justify({ name: c.name, file: c.path, line: 1, duplicates: [...new Set(dups.map((d) => d.name))] }, justifications));
     }
   }
   for (const k of ["new_components", "new_layouts", "raw_colours", "raw_spacing", "raw_motion", "missing_reduced_motion", "new_packages", "stale_inventory", "near_duplicates"])
@@ -272,11 +254,11 @@ function main() {
   // New files are usually untracked until committed, so the diff alone would miss them.
   const gitList = (args) => execFileSync("git", args, { cwd: a.project, encoding: "utf8" }).split("\n").filter(Boolean);
   const names = a.all
-    ? [...new Set([...gitList(["ls-files"]), ...gitList(["ls-files", "--others", "--exclude-standard"])])]
+    ? listProjectFiles(a.project)
     : a.files
     ? a.files.split(",").map((s) => s.trim()).filter(Boolean)
     : [...new Set([...gitList(["diff", "--name-only", "--relative", "--diff-filter=d", a.base || "HEAD"]), ...gitList(["ls-files", "--others", "--exclude-standard"])])];
-  const SKIP = /(^|\/)(\.artist|node_modules)\/|\.(png|jpe?g|webp|gif|ico|avif|woff2?|ttf|otf|mp4|webm|pdf|zip)$/i;
+  const SKIP = /(^|\/)(\.artist|node_modules|\.git|\.worktrees)\/|\.(png|jpe?g|webp|gif|ico|avif|woff2?|ttf|otf|mp4|webm|pdf|zip)$/i;
   const files = names.filter((n) => !SKIP.test(n.replace(/\\/g, "/"))).map((n) => {
     try { return { path: n, content: readFileSync(join(a.project, n), "utf8") }; } catch (e) { throw new Error(`cannot read ${n}: ${e.message}`); }
   });

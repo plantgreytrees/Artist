@@ -98,7 +98,8 @@ test("animation without a reduced-motion fallback is flagged", () => {
 });
 
 const fixtureInventory = () => JSON.parse(read("docs/design/inventory.json"));
-const allFiles = () => [...changed, "src/components/Button.tsx", "src/components/FadeIn.tsx", "src/styles/tokens.css"].map((path) => ({ path, content: read(path) }));
+const pricingCard = { path: "src/components/PricingCard.tsx", content: "type PricingCardProps = { price: string };\nexport function PricingCard({ price }: PricingCardProps) { return <div>{price}</div>; }\n" };
+const allFiles = () => [...[...changed, "src/components/Button.tsx", "src/components/FadeIn.tsx", "src/styles/tokens.css"].map((path) => ({ path, content: read(path) })), pricingCard];
 
 test("--all adds stale inventory and near-duplicates; default mode does not", () => {
   const r = checkReuse({ designMd, files: allFiles(), justifications, all: true, inventory: fixtureInventory() });
@@ -108,15 +109,15 @@ test("--all adds stale inventory and near-duplicates; default mode does not", ()
   assert.ok(d, "PriceCard near-duplicates PricingCard");
   assert.deepEqual([].concat(d.duplicates), ["PricingCard"]);
   assert.equal(d.file, "src/components/PriceCard.tsx");
+  assert.ok(r.near_duplicates.some((x) => x.name === "PricingCard"), "pairwise: both sides are reported");
   const plain = checkReuse({ designMd, files: allFiles(), justifications });
   assert.equal(plain.stale_inventory, undefined);
   assert.equal(plain.near_duplicates, undefined);
 });
 
 test("same component name at a different path is a near-duplicate", () => {
-  const inv = fixtureInventory();
-  inv.components.push({ name: "Hero", path: "src/components/Hero.tsx", props: [], variants: {}, tokensUsed: [], usage: { count: 0, files: [] }, status: "current" });
-  const r = checkReuse({ designMd, files: [{ path: "src/ui/Hero.tsx", content: "export function Hero() { return null; }" }], all: true, inventory: inv });
+  const hero = "export function Hero() { return null; }";
+  const r = checkReuse({ designMd, files: [{ path: "src/components/Hero.tsx", content: hero }, { path: "src/ui/Hero.tsx", content: hero }], all: true, inventory: { components: [] } });
   assert.ok(r.near_duplicates.some((x) => x.name === "Hero" && x.file === "src/ui/Hero.tsx"));
 });
 
@@ -131,6 +132,7 @@ test("format 1 DESIGN.md exits 2 with an instruction", () => {
 test("CLI --all scans every file and writes schema 2 with the new categories", () => {
   const { p, commit } = mkRepo();
   spawnSync("cp", ["-r", fx + "/.", p]);
+  writeFileSync(join(p, "src/components/PricingCard.tsx"), pricingCard.content);
   commit();
   writeFileSync(join(p, "src/untracked.tsx"), "export const x = <p style={{color:'#abcdef'}} />;\n");
   mkdirSync(join(p, "node_modules/foo"), { recursive: true });
@@ -276,4 +278,84 @@ test("S6: href anchors and var() colour functions are not colours", () => {
     files: [{ path: "src/a.css", content: 'a{color:hsl(var(--primary))}\n<a href="#feed"></a><a href=#bead></a><b id="#abc"></b>' }],
   });
   assert.deepEqual(r.raw_colours, []);
+});
+
+// ---- fix2-scan: whole-project audit over a real git repo ----
+const AUDIT = join(here, "fixtures", "audit");
+const INV = join(here, "inventory.mjs");
+const gitCommit = (git) => { git("add", "-A"); git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"); };
+const auditRepo = ({ only, ignore } = {}) => {
+  const { p, git } = mkRepo();
+  if (only) for (const f of only) { mkdirSync(dirname(join(p, f)), { recursive: true }); writeFileSync(join(p, f), readFileSync(join(AUDIT, f))); }
+  else spawnSync("cp", ["-r", AUDIT + "/.", p]);
+  if (ignore) writeFileSync(join(p, ".gitignore"), ignore);
+  gitCommit(git);
+  return { p, git };
+};
+const inventory = (p) => spawnSync(process.execPath, [INV, "--project", p], { encoding: "utf8" });
+const reuseAll = (p) => {
+  const { res, out } = runCli(join(here, "reuse-check.mjs"), p, ["--all"]);
+  const f = join(out, "reuse.json");
+  return { res, j: existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : null };
+};
+
+test("W1: after inventory, --all reports same-name and prop-overlap near-duplicates", () => {
+  const { p } = auditRepo();
+  assert.equal(inventory(p).status, 0);
+  const { res, j } = reuseAll(p);
+  assert.equal(res.status, 1, res.stderr);
+  const files = j.near_duplicates.map((x) => x.file);
+  assert.ok(files.includes("src/components/Hero.tsx") && files.includes("src/ui/Hero.tsx"), JSON.stringify(j.near_duplicates));
+  const banner = j.near_duplicates.find((x) => x.name === "Banner");
+  assert.deepEqual([].concat(banner.duplicates), ["Promo"]);
+  assert.ok(j.near_duplicates.some((x) => x.name === "Promo"));
+  assert.deepEqual(j.stale_inventory, []);
+});
+
+test("W1: an inventoried file that was deleted is stale; a fresh inventory has none", () => {
+  const { p } = auditRepo();
+  assert.equal(inventory(p).status, 0);
+  assert.deepEqual(reuseAll(p).j.stale_inventory, []);
+  rmSync(join(p, "src/components/Promo.tsx"));
+  const { j } = reuseAll(p);
+  assert.deepEqual(j.stale_inventory.map((x) => x.file), ["src/components/Promo.tsx"]);
+  assert.equal(j.near_duplicates.some((x) => x.name === "Banner"), false);
+});
+
+test("W3: a tracked file deleted without staging does not make --all or inventory exit 2", () => {
+  const { p } = auditRepo();
+  rmSync(join(p, "src/ui/Hero.tsx"));
+  assert.equal(inventory(p).status, 0);
+  const { res, j } = reuseAll(p);
+  assert.ok(res.status === 0 || res.status === 1, res.stderr);
+  assert.ok(j);
+});
+
+test("W4: markdown, svg and docs/design/** are not scanned", () => {
+  const { p, git } = auditRepo({ only: ["DESIGN.md", "NOTES.md", "public/logo.svg", "src/styles/tokens.css"] });
+  mkdirSync(join(p, "docs/design"), { recursive: true });
+  writeFileSync(join(p, "docs/design/consistency.md"), "# Consistency\n\n#abcdef at 13px, transition: all 0.42s\n");
+  writeFileSync(join(p, "docs/design/extra.css"), "a{color:#abcdef;padding:13px}");
+  gitCommit(git);
+  const { res, j } = reuseAll(p);
+  assert.equal(res.status, 0, res.stderr);
+  for (const k of ["raw_colours", "raw_spacing", "raw_motion", "missing_reduced_motion"]) assert.deepEqual(j[k], [], k);
+});
+
+test("W5: git-ignored build output is neither inventoried nor flagged", () => {
+  const { p } = auditRepo({ ignore: "dist/\n" });
+  mkdirSync(join(p, "dist"), { recursive: true });
+  writeFileSync(join(p, "dist/Foo.tsx"), "export function Foo() { return <i style={{color:'#abcdef'}} />; }\n");
+  assert.equal(inventory(p).status, 0);
+  const inv = JSON.parse(readFileSync(join(p, "docs/design/inventory.json"), "utf8"));
+  assert.equal(inv.components.some((c) => c.name === "Foo"), false);
+  const { j } = reuseAll(p);
+  assert.equal(JSON.stringify(j).includes("dist/Foo.tsx"), false);
+  assert.equal(JSON.stringify(j).includes("#abcdef"), false);
+});
+
+test("S6: Unparsed rows are not read as packages", () => {
+  const md = "---\nformat: 2\n---\n## Packages\n| package | version | capability |\n|---|---|---|\n| lucide-react | 1 | icons |\n\n## Unparsed\n| path | reason |\n|---|---|\n| d3 | invalid JSON |\n";
+  const r = checkReuse({ designMd: md, files: [{ path: "package.json", content: '{"dependencies":{"recharts":"1"}}' }] });
+  assert.equal(r.new_packages[0].duplicates, undefined);
 });
