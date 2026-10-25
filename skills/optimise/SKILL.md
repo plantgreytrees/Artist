@@ -29,7 +29,7 @@ Out of scope: deep security review and dependency review. Defer them to craftsma
 2. Pick one failure or smell. Find its cause (trace or DOM via MCP if needed).
 3. Fix it, reusing what exists, in this order: an inventoried component, layout or schema (check props and variants first), an existing semantic token, an installed package (for example chart.js for charts, the installed icon set). Never hand-roll what an installed package covers.
 4. Colours, spacing and motion only through semantic tokens (CSS variables or theme keys), never literals. Every animation uses the Motion tokens and has a reduced-motion fallback.
-5. Anything new (component, layout, colour, package, including a new dependency) needs a one-line entry in the run's `justifications.json`, keyed by the item name (component or package name, colour value, or file path), with the reason as the value. Also propose it as an inventory or token addition.
+5. Anything new (component, layout, colour, package, including a new dependency) needs a one-line entry in the run's `justifications.json`, with the reason as the value. Key each entry by what reuse-check reports: the component, layout or package name; the colour, spacing or motion value exactly as reported (for example `13px`, `cubic-bezier(...)`); or the file path for a `missing_reduced_motion` item. Also propose it as an inventory or token addition.
 6. Re-measure with `verify.mjs` after each fix. Report before and after values from `report.json`; revert a fix that does not help.
 7. Reuse check:
 
