@@ -183,6 +183,20 @@ async function gotoLocal(page, url, guard, allowRemote) {
   if (guard.blocked || (!allowRemote && !isLoopback(host))) throw offLoopback(guard.blocked || host);
 }
 
+// Headless Chromium can refuse a capture before the compositor has a frame,
+// most often under CPU load; wait for a frame and try again.
+const SCREENSHOT_ATTEMPTS = 3;
+export async function screenshot(page, options) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await page.screenshot(options);
+    } catch (error) {
+      if (attempt >= SCREENSHOT_ATTEMPTS || !/Unable to capture screenshot/.test(error.message)) throw error;
+      await page.evaluate(() => new Promise((r) => globalThis.requestAnimationFrame(() => r())));
+    }
+  }
+}
+
 const VITALS_HOOK = `;(function () {
   var v = (window.__artistVitals = { lcp: null, cls: 0 });
   webVitals.onLCP(function (m) { v.lcp = m.value; }, { reportAllChanges: true });
@@ -253,7 +267,7 @@ export async function run({
         guard.page = page;
         await gotoLocal(page, url, guard, allowRemote);
         const file = `${width}.png`;
-        await page.screenshot({ path: path.join(runDir, file), fullPage: true, timeout: LOAD_TIMEOUT_MS });
+        await screenshot(page, { path: path.join(runDir, file), fullPage: true, timeout: LOAD_TIMEOUT_MS });
         screenshots[width] = file;
         const result = await new deps.AxeBuilder({ page }).analyze();
         const counts = Object.fromEntries(IMPACTS.map((k) => [k, 0]));
