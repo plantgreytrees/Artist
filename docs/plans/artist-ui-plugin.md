@@ -5,7 +5,7 @@ level: feature
 priority: P1
 idea: docs/ideas/artist-ui-plugin.md
 classification: in-scope (docs/ideas/artist-ui-plugin.md:3 status architected; owner "Please build it", 2026-10-25)
-tracker_rows: [artist-ui-plugin#scaffold, artist-ui-plugin#verify-tests, artist-ui-plugin#verify-impl, artist-ui-plugin#review-html, artist-ui-plugin#reuse-check, artist-ui-plugin#skills-core, artist-ui-plugin#skill-create, artist-ui-plugin#evals-readme, artist-ui-plugin#craftsman-seam, artist-ui-plugin#integration]
+tracker_rows: [artist-ui-plugin#scaffold, artist-ui-plugin#verify-tests, artist-ui-plugin#verify-impl, artist-ui-plugin#review-html, artist-ui-plugin#reuse-check, artist-ui-plugin#skills-core, artist-ui-plugin#skill-create, artist-ui-plugin#evals-readme, artist-ui-plugin#craftsman-seam, artist-ui-plugin#integration, artist-ui-plugin#inventory, artist-ui-plugin#reuse-check-v2, artist-ui-plugin#skills-v2]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -151,6 +151,45 @@ units:
       write: [CHANGELOG.md]
     arch: [ARCH-PLUGIN-20, ARCH-VERIFY-08]
     tooling: { implementer: implementer, gates: [code-reviewer], skills: [verification-before-completion], guards: [secrets-scan], mcp: [] }
+  - id: 11
+    scope_id: inventory
+    project: "."
+    depends_on: []
+    module: scripts/inventory.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/reuse-check.mjs, skills/design-system/references/design-template.md]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/fixtures/inventory/DESIGN.md, scripts/fixtures/inventory/package.json, scripts/fixtures/inventory/apps/web/package.json, scripts/fixtures/inventory/apps/web/src/components/Button.tsx, scripts/fixtures/inventory/apps/web/src/components/Card.tsx, scripts/fixtures/inventory/apps/web/src/app/layout.tsx, scripts/fixtures/inventory/apps/web/src/app/pricing/page.tsx, scripts/fixtures/inventory/apps/web/src/schemas/signup.ts, scripts/fixtures/inventory/apps/web/schemas/order.schema.json, scripts/fixtures/inventory/apps/web/src/types/props.ts]
+    arch: [ARCH-VERIFY-16, ARCH-VERIFY-11, ARCH-PLUGIN-25]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 12
+    scope_id: reuse-check-v2
+    project: "."
+    depends_on: [inventory]
+    module: scripts/reuse-check.mjs + scripts/review-html.mjs
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/inventory.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/fixtures/reuse/DESIGN.md, scripts/fixtures/reuse/justifications.json, scripts/fixtures/reuse/src/components/Button.tsx, scripts/fixtures/reuse/src/components/PriceCard.tsx, scripts/fixtures/reuse/src/app/pricing/layout.tsx, scripts/fixtures/reuse/src/app/pricing/page.tsx, scripts/fixtures/reuse/src/styles/tokens.css, scripts/fixtures/reuse/src/components/FadeIn.tsx, scripts/fixtures/reuse/docs/design/inventory.json, scripts/fixtures/reuse/package.json, scripts/fixtures/reuse/package.base.json, scripts/review-html.mjs, scripts/review-html.test.mjs, scripts/fixtures/reuse.sample.json]
+    arch: [ARCH-VERIFY-15, ARCH-VERIFY-13, ARCH-VERIFY-11, ARCH-PLUGIN-26, ARCH-PLUGIN-28]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 13
+    scope_id: skills-v2
+    project: "."
+    depends_on: [inventory, reuse-check-v2]
+    module: skills + README + evals
+    language: markdown
+    security: normal
+    scope:
+      read: [scripts/inventory.mjs, scripts/reuse-check.mjs, skills/design-system/SKILL.md, skills/design-system/references/design-template.md, skills/create/SKILL.md, skills/optimise/SKILL.md, skills/create/references/web.md, skills/create/references/mobile.md, README.md, evals/design-system/prompt.md, evals/design-system/graders/criteria.md, CHANGELOG.md]
+      docs: [docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
+      write: [skills/design-system/SKILL.md, skills/design-system/references/design-template.md, skills/create/SKILL.md, skills/optimise/SKILL.md, skills/create/references/web.md, skills/create/references/mobile.md, README.md, evals/design-system/prompt.md, evals/design-system/graders/criteria.md, CHANGELOG.md]
+    arch: [ARCH-PLUGIN-25, ARCH-PLUGIN-26, ARCH-PLUGIN-27, ARCH-PLUGIN-28, ARCH-PLUGIN-14, ARCH-PLUGIN-17, ARCH-PLUGIN-08, ARCH-VERIFY-01]
+    tooling: { implementer: implementer, gates: [], skills: [], guards: [], mcp: [] }
 ---
 
 # Plan: Build the artist UI plugin
@@ -382,6 +421,73 @@ Depends on: all
 - [ ] 9.2 Run `node --test scripts/*.test.mjs` with the browser cases enabled → accept: all pass
 - [ ] 9.3 End to end: serve `scripts/fixtures/` on loopback, run `node scripts/verify.mjs <url> --project <tmp>`, then `node scripts/reuse-check.mjs --project scripts/fixtures/reuse --run <run dir> --files src/app/pricing/page.tsx` (expect exit 1 with the fixture's raw colours), then `node scripts/review-html.mjs <run dir>` → accept: verify exits 0; `review.html` has every section, including reuse findings, and no network references
 - [ ] 9.4 Write `CHANGELOG.md` with a `## [0.1.0]` section describing the first release, including the rollback note. This task goes last → accept: the file exists with one release section
+
+### Step 11 — inventory (node ESM), amendment 2026-10-25
+Tooling: implementer · skills test-driven-development
+- [ ] 11.1 Write the tests first (`scripts/inventory.test.mjs`) against a fixture project in `scripts/fixtures/inventory/`:
+  - root `package.json` with workspaces, and `apps/web/package.json` with chart.js and lucide-react
+  - `Button.tsx` with a props type, `variant: "primary" | "secondary"`, using `var(--color-action-primary)`
+  - `Card.tsx` marked `/** @deprecated use Panel */`
+  - `app/layout.tsx` wrapping `app/pricing/page.tsx`, which uses Button twice
+  - a zod schema in `src/schemas/signup.ts`, `schemas/order.schema.json`, and an exported `type PriceProps` in `src/types/props.ts`
+  - a format-2 `DESIGN.md` with inventory markers
+
+  Cases:
+  - `inventory.json` has `schema: 1`.
+  - Button has props including `variant` with both values, `tokensUsed` including `--color-action-primary`, `usage.count` 2 listing the page file, and `status: "current"`. Card has `status: "deprecated"`.
+  - The layout lists the route it wraps (`/pricing`).
+  - Schemas include the zod schema, the JSON Schema file and `PriceProps`.
+  - Packages include both workspaces' dependencies with capability tags (chart.js → charts, lucide-react → icons).
+  - Text in `DESIGN.md` outside the markers is byte-identical after a run; inside the markers are readable tables for Components, Layouts, Schemas and Packages.
+  - A format-1 DESIGN.md exits 2 with "rerun design-system init".
+
+  → accept: the tests fail first, on the missing module
+- [ ] 11.2 Write `scripts/inventory.mjs`:
+  - CLI `node scripts/inventory.mjs --project <dir>`; exports `buildInventory(files)` (pure) and `renderSections(inventory)`.
+  - Static parsing only (regex and light parsing, no TypeScript compiler).
+  - Never edits source. Items it can't parse are listed under `unparsed`, not dropped.
+  - Skips `node_modules/**` and `.artist/**`. Exits 0, or 2 on error.
+
+  → accept: `node --test scripts/inventory.test.mjs` passes
+
+### Step 12 — reuse-check-v2 (node ESM)
+Tooling: implementer · skills test-driven-development
+Depends on: inventory
+- [ ] 12.1 Write the tests first. Fixture changes:
+  - Convert `scripts/fixtures/reuse/DESIGN.md` to format 2: primitives; semantic tokens with variables; one brand theme (light and dark); Spacing scale 4/8/16/32px; Motion tokens 150ms/300ms plus one easing; Platform notes listing `src/styles/tokens.css` as the token file.
+  - Add `tokens.css`, which defines the variables with literal hex.
+  - Add `FadeIn.tsx`: a framer-motion animation with no reduced-motion fallback and `transition: { duration: 0.42 }`.
+  - Add a fixture `docs/design/inventory.json` with one stale entry (a path that doesn't exist) and one near-duplicate (`PriceCard` vs the inventoried `PricingCard`, same props).
+
+  Cases:
+  - A hex equal to a token value in `page.tsx` IS reported (strict); the same hex inside `tokens.css` is not.
+  - `padding: 13px` and Tailwind `p-[13px]` → `raw_spacing`; `16px` and `p-4` → not reported.
+  - `0.42s`/`420ms` and an unknown `cubic-bezier(...)` → `raw_motion`; `300ms` → not reported.
+  - `FadeIn.tsx` → `missing_reduced_motion`; a file using `useReducedMotion`, `motion-reduce:` or `prefers-reduced-motion` → not reported.
+  - `--all` scans every source file and adds `stale_inventory` and `near_duplicates`.
+  - A format-1 DESIGN.md exits 2; `reuse.json` has `schema: 2`; the existing W1/W2/W4/S6 tests still pass.
+
+  → accept: the new cases fail first
+- [ ] 12.2 Implement them in `scripts/reuse-check.mjs` → accept: `node --test scripts/reuse-check.test.mjs` passes
+- [ ] 12.3 Make `scripts/review-html.mjs` render the new categories (spacing, motion, reduced motion, stale, near-duplicates) in the reuse section, escaped; update `scripts/fixtures/reuse.sample.json` and the test → accept: `node --test scripts/review-html.test.mjs` passes; full suite green
+
+### Step 13 — skills-v2 (markdown)
+Depends on: inventory, reuse-check-v2
+- [ ] 13.1 Update `skills/design-system`:
+  - Format-2 template with these sections: Primitives; Semantic tokens with variables; Themes (one or more brands × light/dark); Type scale; Spacing; Motion; generated Components/Layouts/Schemas/Packages between markers; Platform notes with the token files.
+  - `init` and `audit` run `node "${CLAUDE_PLUGIN_ROOT}/scripts/inventory.mjs" --project <dir>`.
+  - `audit` runs `reuse-check.mjs --all` and writes a readable `docs/design/consistency.md`, grouped by category, each item with `file:line` and a suggested fix.
+  - Adding a brand means adding a theme set, never new literals.
+
+  → accept: SKILL.md under 500 lines; the template has every section and both markers
+- [ ] 13.2 Update `skills/create` and `skills/optimise`: colours, spacing and motion only through semantic tokens; check the inventory (components, layouts, schemas, packages) before writing; every animation uses motion tokens and has a reduced-motion fallback → accept: the wording is present; the stop condition is still ARCH-PLUGIN-24
+- [ ] 13.3 Update the platform references:
+  - `references/web.md`: map semantic tokens to CSS variables and the Tailwind theme (`colors: { action: { primary: "var(--color-action-primary)" } }`); switch brands via `[data-theme]`/`[data-brand]` attribute sets; `motion-safe:`/`motion-reduce:`.
+  - `references/mobile.md`: a theme object per brand, `useColorScheme`, `AccessibilityInfo.isReduceMotionEnabled` / reanimated `useReducedMotion`.
+
+  → accept: both sections present
+- [ ] 13.4 README: add "Theming and white-labelling" and "Keeping the design consistent" sections (inventory, audit, consistency.md); the `evals/design-system` criteria check the inventory run and the consistency report → accept: sections present; validate passes
+- [ ] 13.5 `CHANGELOG.md`: add `## [Unreleased]` with one bullet covering design depth, theming, consistency and motion. This task goes last → accept: section present
 
 ## Sequencing
 1. scaffold
