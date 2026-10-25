@@ -81,7 +81,16 @@ describe("summariseCwv", () => {
     assert.ok(Math.abs(s.spread - 100 / 1050) < 1e-9);
     assert.equal(s.unstable, false);
   });
-  test("unstable when LCP spread > 0.20", () => {
+  test("fast page with >20% relative but <=100 ms absolute spread is stable", () => {
+    const s = summariseCwv([
+      { lcp_ms: 20, cls: 0 },
+      { lcp_ms: 36, cls: 0 },
+      { lcp_ms: 28, cls: 0 },
+    ]);
+    assert.ok(s.spread > 0.2);
+    assert.equal(s.unstable, false);
+  });
+  test("unstable when LCP spread > 0.20 and > 100 ms", () => {
     const s = summariseCwv([
       { lcp_ms: 1000, cls: 0 },
       { lcp_ms: 1500, cls: 0 },
@@ -116,6 +125,10 @@ describe("browser integration", { skip: skipBrowser }, () => {
   let base;
   before(async () => {
     server = http.createServer((req, res) => {
+      if (req.url === "/redirect-away") {
+        res.writeHead(302, { location: "http://example.invalid/" }).end();
+        return;
+      }
       const name = path.basename((req.url || "/").split("?")[0]);
       const file = path.join(fixtures, name);
       if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
@@ -163,6 +176,12 @@ describe("browser integration", { skip: skipBrowser }, () => {
       assert.ok(f === path.join(project, ".artist", "runs") || f.startsWith(runsRoot + path.sep), f);
     }
     assert.ok(res.runDir.startsWith(runsRoot + path.sep));
+  });
+
+  test("a redirect off loopback exits 2 with a loopback error", async () => {
+    const res = await run({ url: `${base}/redirect-away`, project: tmp("artist-proj-") });
+    assert.equal(res.exitCode, 2);
+    assert.match(res.error || "", /loopback/);
   });
 
   test("axe-violation.html fails with serious or critical issues", async () => {

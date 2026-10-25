@@ -40,7 +40,7 @@ flowchart LR
 | ARCH-VERIFY-04 | Loopback-only unless `--allow-remote` | Playwright's origin lists are not a security boundary | trust the URL |
 | ARCH-VERIFY-05 | Pinned deps in CLAUDE_PLUGIN_DATA | never pollute the target project; survives plugin updates | install into project |
 | ARCH-VERIFY-06 | Output only under `.artist/runs/` | no stray files in source | write beside components |
-| ARCH-VERIFY-07 | 3 runs, median, flag >20% spread | the idea's kill criterion for noisy perf | single run |
+| ARCH-VERIFY-14 | 3 runs, median; unstable only when LCP spread is >20% AND >100 ms (supersedes 07, owner-approved 2026-10-25) | catches real jitter; a fast local page (28 ms LCP) showed 57% relative spread from millisecond noise, so pure-relative failed every fast page | pure 20% (07); 20% and >250 ms |
 | ARCH-VERIFY-08 | Exit 0/1/2; crash ≠ pass | fail closed | treat crash as skip |
 | ARCH-VERIFY-13/10 | Offline `review.html` with slider, scores, axe, CWV, token diff and reuse findings (13 supersedes 09) | owner wants to see every change visually | terminal only; published artifact |
 | ARCH-VERIFY-12 | Deterministic `reuse-check.mjs` → `reuse.json`; blocks on unjustified new components, layouts, raw colours or dependencies, and marks a new package that duplicates an installed one's capability | owner chose a script check over model judgement, and blocking over advisory | instructions + critic only; advisory |
