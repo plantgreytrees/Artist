@@ -1,0 +1,11 @@
+{
+  "schema": 3,
+  "ratios": {
+    "colours": { "conforming": 10, "justified": 2, "unjustified": 3, "total": 15 },
+    "spacing": { "conforming": 7, "justified": 0, "unjustified": 1, "total": 8 },
+    "motion": { "conforming": 1, "justified": 1, "unjustified": 0, "total": 2 },
+    "reduced_motion": { "conforming": 2, "justified": 0, "unjustified": 0, "total": 2 },
+    "component_tokens": { "conforming": 1, "justified": 0, "unjustified": 1, "total": 2 },
+    "component_api": { "conforming": 3, "justified": 0, "unjustified": 2, "total": 5 }
+  }
+}
