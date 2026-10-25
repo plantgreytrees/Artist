@@ -18,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatOf } from "./design-md.mjs";
 
 export const START = "<!-- artist:inventory:start -->";
 export const END = "<!-- artist:inventory:end -->";
@@ -35,11 +36,8 @@ export const CAPS = {
 const matches = (pat, name) => (pat.endsWith("/*") ? name.startsWith(pat.slice(0, -1)) : pat === name);
 export const capOf = (name) => Object.keys(CAPS).find((c) => CAPS[c].some((p) => matches(p, name))) ?? null;
 
-export function formatOf(md) {
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(md);
-  const f = fm && /^format:\s*(\d+)\s*$/m.exec(fm[1]);
-  return f ? Number(f[1]) : 1;
-}
+// formatOf lives in design-md.mjs (ARCH-VERIFY-25); re-exported for compatibility.
+export { formatOf };
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const uniqSorted = (xs) => [...new Set(xs)].sort(cmp);
