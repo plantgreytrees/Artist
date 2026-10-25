@@ -7,7 +7,7 @@
 
 | plan | unit | module | status | evidence | updated |
 |---|---|---|---|---|---|
-| [artist-ui-plugin](./artist-ui-plugin.md) | craftsman-seam | verify craftsman ui-gate + EXTENDING (amended) | PENDING | amended c9be3be: verifies craftsman artist-ui-gate once it lands on craftsman m… | 2026-10-25 |
+| [artist-ui-plugin](./artist-ui-plugin.md) | craftsman-seam | verify craftsman ui-gate + EXTENDING (amended) | COMPLETE | all 2 acceptance criteria ticked; craftsman origin/main 5b0faf9: ui-gate wired … | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | evals-readme | evals + README | COMPLETE | all 1 acceptance criteria ticked; merged 6c1ba29 (commit 2eb5182); scope correc… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | integration | whole plugin | COMPLETE | all 3 acceptance criteria ticked; merged e70dd8a (commit aca59a1); claude plugi… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | inventory | scripts/inventory.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 831d62c (commit 7a75a33); red 13/13 fa… | 2026-10-25 |
