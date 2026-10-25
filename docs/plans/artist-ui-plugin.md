@@ -129,14 +129,14 @@ units:
     scope_id: craftsman-seam
     project: craftsman
     depends_on: []
-    module: agents/ui-ux-reviewer.md, skills/design-review, EXTENDING.md
-    language: markdown
+    module: scripts/ui-gate.mjs, agents/ui-ux-reviewer.md, EXTENDING.md (built by craftsman's own artist-ui-gate plan; verified here)
+    language: javascript + markdown
     security: normal
     scope:
-      read: [scripts/doc-size-policy.mjs, scripts/wiring.test.mjs]
-      docs: [docs/architecture/slim.rules.md]
-      write: [agents/ui-ux-reviewer.md, skills/design-review/SKILL.md, EXTENDING.md, CHANGELOG.md]
-    arch: [ARCH-SLIM-01, ARCH-SLIM-02, ARCH-SLIM-06, ARCH-SLIM-08]
+      read: [scripts/ui-gate.mjs, scripts/doc-size-policy.mjs, agents/ui-ux-reviewer.md, EXTENDING.md, CHANGELOG.md]
+      docs: [docs/architecture/slim.rules.md, docs/architecture/gates.rules.md]
+      write: []
+    arch: [ARCH-SLIM-01, ARCH-SLIM-02, ARCH-SLIM-06, ARCH-SLIM-08, ARCH-SLIM-15, ARCH-GATES-01, ARCH-GATES-04, ARCH-GATES-06]
     tooling: { implementer: implementer, gates: [], skills: [], guards: [doc-size-policy], mcp: [] }
   - id: 9
     scope_id: integration
@@ -403,17 +403,15 @@ Depends on: skills-core, skill-create
 
   → accept: all seven integrations named; no `hooks/` or `commands/` dir in the repo
 
-### Step 8 — craftsman-seam (craftsman, markdown, normal)
+### Step 8 — craftsman-seam (craftsman, verify only), amended 2026-10-25
 Depends on: none
-- [ ] 8.1 Edit `agents/ui-ux-reviewer.md`:
-  - Add one sentence: read `docs/design/DESIGN.md` first when it exists, and use its tokens as the consistency baseline.
-  - Stay ≤ 2762 bytes (82 bytes of headroom today). Trim wording in the same file if needed; never raise the cap.
 
-  → accept: `node scripts/doc-size-policy.mjs` exits 0
-- [ ] 8.2 Edit `skills/design-review/SKILL.md`: add the same baseline sentence; stay ≤ 2253 bytes → accept: `node scripts/doc-size-policy.mjs` exits 0
-- [ ] 8.3 Edit `EXTENDING.md` §6: add a short subsection on allow-listing another plugin's read-only agent via `execution.builtinAgents` (example: `"artist:design-critic"`), noting the guard is unchanged → accept: the subsection is present; no script changed
-- [ ] 8.4 Run craftsman's suite: `node --test scripts/*.test.mjs` → accept: green
-- [ ] 8.5 Add one bullet to `CHANGELOG.md` under `[Unreleased]`, last in this step → accept: `[Unreleased]` stays under 8 KB
+Amendment (owner-approved 2026-10-25, AskUserQuestion): craftsman's own `/craftsman:auto` decided Artist is optional and detected (ARCH-SLIM-15 supersedes SLIM-13; gates ARCH-GATES-01..06). Craftsman builds the seam in its `artist-ui-gate` plan; this step only verifies what lands on craftsman `main`. Superseded: the "DESIGN.md baseline sentence" edits to `ui-ux-reviewer.md` and `skills/design-review/SKILL.md` (design-review is deleted; token and reuse consistency comes from Artist's reuse-check).
+- [ ] 8.1 `scripts/ui-gate.mjs` routes the ui gate: with `artist@artist-marketplace` enabled and a format-2 `docs/design/DESIGN.md`, it runs Artist's `reuse-check --base <merge-base>`; `artist:design-critic` only when the unit worktree has an untracked `.artist/runs/*/report.json`; otherwise the accessibility-floor `ui-ux-reviewer` → accept: script and its tests present on craftsman `main`
+- [ ] 8.2 `agents/ui-ux-reviewer.md` is the accessibility floor; `skills/design-review/SKILL.md` and its cap entry are removed; no cap raised → accept: `node scripts/doc-size-policy.mjs` exits 0
+- [ ] 8.3 `EXTENDING.md` documents `{"execution":{"builtinAgents":["Explore","artist:design-critic"]}}` (read-only agent, `agent-mode-guard.mjs` unchanged, NOT ISOLATED fallback), in any section → accept: present
+- [ ] 8.4 Craftsman suite green: `node --test scripts/*.test.mjs` → accept: exit 0
+- [ ] 8.5 One `CHANGELOG.md` `[Unreleased]` bullet → accept: `[Unreleased]` stays under 8 KB
 
 ### Step 9 — integration (artist, mixed, normal)
 Depends on: all

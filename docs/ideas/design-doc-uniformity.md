@@ -191,13 +191,13 @@ ratios.
 - Should init generate token files? → **Document + enforce + propose**: init proposes a `tokens.css` / Tailwind `@theme inline` (or `--bs-*`) diff the user accepts, extending today's "apply accepted token changes" step (`skills/design-system/SKILL.md:36`); it never owns or silently rewrites project token files (answered 2026-10-25, resumed session).
 - Component-variable tier? → **Yes, optional per component**: only components with real variants or brand overrides get a `## Component tokens` block, each entry aliasing a semantic token, never a literal (answered 2026-10-25, resumed session). Confirms rec. 2.
 - Tailwind v3 (JS config) support? → **No, v4 CSS-first only** (user, 2026-10-25, during `/architect --deep`). This removes the verdict's "most likely to flip" fact; v3 configs get a "use `@theme`" note (ARCH-PLUGIN-38, -41).
-- Component-tokens strictness? → **Strict**: a variant-bearing component without a block counts `unjustified` (ARCH-PLUGIN-35, ARCH-VERIFY-21).
-- Component-API rule? → **Same-name canonical value set, synonyms as advisory hints only** (ARCH-VERIFY-21).
-- Deprecation? → **JSDoc or an exact `Deprecate <Name>` row only**; init migrates prose deprecations (ARCH-PLUGIN-39, ARCH-VERIFY-22).
-- Variable binding for Type/Spacing/Motion? → **Naming convention plus an optional `variable` column** (ARCH-VERIFY-25).
+- Component-tokens strictness? → **Strict**: a variant-bearing component without a block counts `unjustified` (ARCH-PLUGIN-35, ARCH-VERIFY-22).
+- Component-API rule? → **Same-name canonical value set, synonyms as advisory hints only** (ARCH-VERIFY-22).
+- Deprecation? → **JSDoc or an exact `Deprecate <Name>` row only**; init migrates prose deprecations (ARCH-PLUGIN-39, ARCH-VERIFY-23).
+- Variable binding for Type/Spacing/Motion? → **Naming convention plus an optional `variable` column** (ARCH-VERIFY-26).
 - Live-tweak panel? → **Not in this version**: the HTML has no `<script>` (ARCH-PLUGIN-37).
 
 ## Next step
-_Architected 2026-10-25 (`--deep`, isolated analyst): ARCH-PLUGIN-35..41, ARCH-VERIFY-21..26._
+_Architected 2026-10-25 (`--deep`, isolated analyst): ARCH-PLUGIN-35..41, ARCH-VERIFY-22..27._
 `/instruction design-doc-uniformity` (cross-cutting: template format, two
 ARCH rule amendments, three scripts, three skills).
