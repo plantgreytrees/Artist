@@ -5,7 +5,7 @@ level: feature
 parent: artist-ui-plugin
 priority: P1
 classification: in-scope (/scrutinise round 1, isolated scrutineer, range f2a2f4c..e70dd8a; all findings verified at file:line, none disputed)
-tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html, scrutinise-artist-ui-plugin#fix2-scan, scrutinise-artist-ui-plugin#fix2-review-html, scrutinise-artist-ui-plugin#fix2-skills, scrutinise-artist-ui-plugin#fix3]
+tracker_rows: [scrutinise-artist-ui-plugin#fix-reuse-check, scrutinise-artist-ui-plugin#fix-verify, scrutinise-artist-ui-plugin#fix-review-html, scrutinise-artist-ui-plugin#fix2-scan, scrutinise-artist-ui-plugin#fix2-review-html, scrutinise-artist-ui-plugin#fix2-skills, scrutinise-artist-ui-plugin#fix3, scrutinise-artist-ui-plugin#fix4]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -113,6 +113,19 @@ units:
       write: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/verify.mjs, scripts/verify.test.mjs, scripts/reuse-check.mjs, scripts/reuse-check.test.mjs]
     arch: [ARCH-VERIFY-16, ARCH-VERIFY-15, ARCH-VERIFY-08, ARCH-PLUGIN-24, ARCH-PLUGIN-27]
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 8
+    scope_id: fix4
+    project: "."
+    depends_on: []
+    module: scripts/inventory.mjs + tests
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/reuse-check.mjs, scripts/reuse-check.test.mjs]
+      docs: [docs/architecture/verify.rules.md]
+      write: [scripts/inventory.mjs, scripts/inventory.test.mjs, scripts/reuse-check.test.mjs]
+    arch: [ARCH-VERIFY-16, ARCH-VERIFY-15]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
 ---
 
 # Plan: Fix the first review's findings in artist
@@ -208,6 +221,16 @@ Tooling: implementer · skills test-driven-development
 - [ ] 7.2 **S2:** first failing tests: `cwvPasses` with `cls: null` and with `cls: NaN` → false. Then require a finite numeric `cls` in `scripts/verify.mjs` → accept: tests fail first, then pass
 - [ ] 7.3 **S3:** first a failing test: two wrapper components each taking only `{ children }` are not near-duplicates, while Banner/Promo still are. Then count prop overlap only when both components have at least 2 props after ignoring `children` and `className`, and build each prop set once before the pairwise loop → accept: test fails first; the full suite is green
 - S4 (`ARCH-VERIFY-15` doesn't name the scanned extensions or the `docs/design/**` exclusion) is a rule-text update for `/sync-docs` → `/architect --update`; it is not part of fix3.
+
+## Round 4 (scrutineer range cd93b1b..eef3c20: 0 Critical, 1 Warning, 3 Suggestion)
+
+### Step 8 — fix4 (node ESM)
+Tooling: implementer · skills test-driven-development
+- [ ] 8.1 **W1:** first a failing test: a temp parent repo whose `.gitignore` ignores `app/`, with `app/.gitignore` = `dist/`, `app/src/a.tsx` and `app/dist/bundle.js` → `listProjectFiles("<tmp>/app")` lists `src/a.tsx` and not `dist/bundle.js`. Then, in `scripts/inventory.mjs`, filter the walked names through the project's own ignore rules (`git check-ignore --no-index --stdin` run in the project honours nested `.gitignore` files), add `dist`, `build`, `out`, `.next`, `.turbo`, `coverage` to the walk's skip set as a floor, and correct the header comment → accept: test fails first, then passes
+- [ ] 8.2 **S2:** tests for the empty-list trigger (parent `.gitignore` `/app/**` → the file is still listed) and that `app/node_modules/x.js` is never listed → accept: both pass
+- [ ] 8.3 **S1:** a test pinning that two components each taking only `{ price }` are not prop-overlap near-duplicates (the ≥2 meaningful-props threshold) → accept: passes
+- [ ] 8.4 **S3:** add a `{ children, className }` wrapper pair to the thin-wrapper test → accept: not flagged; full suite green
+- The `ARCH-VERIFY-15` rule text (threshold, scanned extensions, `docs/design/**` exclusion) is updated by `/sync-docs` → `/architect --update`, together with round 3's S4; it is not part of fix4.
 
 ## Sequencing
 fix-reuse-check and fix-verify are independent; fix-review-html follows fix-verify because it imports `THRESHOLDS` and renders `targets`.
