@@ -52,14 +52,17 @@ Adding a brand means adding a theme set (Themes rows and the theme file entries)
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/reuse-check.mjs" --project <dir> --run .artist/audit --all
    ```
-   It writes `.artist/audit/reuse.json` (schema 2) with the categories `new_components`, `new_layouts`, `raw_colours`, `raw_spacing`, `raw_motion`, `missing_reduced_motion`, `new_packages`, `stale_inventory` and `near_duplicates`. Exit 1 only means findings exist; exit 2 is a tool error.
+   It writes `.artist/audit/reuse.json` (schema 3) with the categories `new_components`, `new_layouts`, `raw_colours`, `raw_spacing`, `raw_motion`, `missing_reduced_motion`, `new_packages`, `stale_inventory`, `near_duplicates` and `component_token_literals`, plus `ratios` (`colours`, `spacing`, `motion`, `reduced_motion`, `component_tokens`, `component_api`, each `{conforming, justified, unjustified, total}`) and the advisory lists `off_token_classes` and `prop_synonyms`. Exit 1 only means findings exist; exit 2 is a tool error.
 3. Write a readable `docs/design/consistency.md` from `reuse.json`, grouped by category, one heading per category with a count. Each item gives `file:line` and a suggested fix:
    - raw colours, raw spacing, raw motion: use the semantic token (name it) instead of the literal.
    - missing reduced-motion: add a `prefers-reduced-motion` / `motion-reduce:` / `useReducedMotion` fallback.
    - near duplicates: merge the duplicate into one component.
    - stale inventory: remove the stale entry (or rerun the inventory).
    - new components, layouts, packages: reuse an inventoried item, or justify and inventory it.
-   List categories with no findings as "none". Copy the `{conforming, justified, unjustified, total}` ratio per category from `reuse.json`, reporting the four numbers separately, never blended.
+   - component token literals (`<Component>.<variable>`): point the Component tokens row at a Semantic, Type scale, Spacing or Motion token.
+   - variant-bearing components without a Component tokens block (`component_tokens` unjustified): propose a block whose rows alias semantic tokens.
+   - component API (`<Component>.<prop>`): align the prop's values with the expected set `reuse.json` names.
+   List categories with no findings as "none". Copy the `{conforming, justified, unjustified, total}` ratio per category from `reuse.json`, reporting the four numbers separately, never blended or totalled; never compute or estimate a number yourself. List `off_token_classes` and `prop_synonyms` under a separate "Advisory (not counted)" heading.
 4. Regenerate the design document with the audit results:
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/design-doc.mjs" --project <dir> --reuse .artist/audit/reuse.json
