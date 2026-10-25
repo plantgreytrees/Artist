@@ -42,7 +42,7 @@ flowchart LR
 | ARCH-VERIFY-06 | Output only under `.artist/runs/` | no stray files in source | write beside components |
 | ARCH-VERIFY-14 | 3 runs, median; unstable only when LCP spread is >20% AND >100 ms (supersedes 07, owner-approved 2026-10-25) | catches real jitter; a fast local page (28 ms LCP) showed 57% relative spread from millisecond noise, so pure-relative failed every fast page | pure 20% (07); 20% and >250 ms |
 | ARCH-VERIFY-08 | Exit 0/1/2; crash ≠ pass | fail closed | treat crash as skip |
-| ARCH-VERIFY-13/10 | Offline `review.html` with slider, scores, axe, CWV, token diff and reuse findings (13 supersedes 09) | owner wants to see every change visually | terminal only; published artifact |
+| ARCH-VERIFY-17/10 | Offline `review.html` with slider, scores, axe, CWV, token diff and reuse findings, written once by `create` at its Finish step via review-html.mjs (17 supersedes 13, which superseded 09) | owner wants to see every change visually | terminal only; published artifact |
 | ARCH-VERIFY-12 | Deterministic `reuse-check.mjs` → `reuse.json`; blocks on unjustified new components, layouts, raw colours or dependencies, and marks a new package that duplicates an installed one's capability | owner chose a script check over model judgement, and blocking over advisory | instructions + critic only; advisory |
 | ARCH-VERIFY-11 | Node ESM plus `node --test` | matches craftsman | another runtime |
 
@@ -64,7 +64,7 @@ be gitignored in target projects (the `design-system init` skill offers to add i
 
 | id | decision | why | rejected alternatives |
 |---|---|---|---|
-| ARCH-VERIFY-15 (supersedes 12) | reuse-check schema 2: also flags every colour literal outside the token/theme files, off-scale spacing, raw durations/easings, missing reduced-motion fallbacks; `--all` scans the whole project and adds stale inventory entries and near-duplicate components | one deterministic tool enforces one consistent, re-brandable design | model-judged audit; changed files only |
+| ARCH-VERIFY-15 (supersedes 12) | reuse-check schema 2: also flags every colour literal outside the token/theme files, off-scale spacing, raw durations/easings, missing reduced-motion fallbacks; `--all` scans the whole project and adds stale inventory entries and near-duplicate components (same name, or ≥2 meaningful props with ≥80% overlap); `docs/design/**` is never scanned | one deterministic tool enforces one consistent, re-brandable design | model-judged audit; changed files only |
 | ARCH-VERIFY-16 | inventory.mjs writes docs/design/inventory.json (components with props, variants, tokens used, usage, status; layouts with routes; zod/yup/JSON Schema/TS schemas; packages) and regenerates DESIGN.md's marked sections | deep, current knowledge of what exists, readable in DESIGN.md and exact in JSON | hand-maintained tables |
 
 **Known limit:** prop and schema extraction is static (regex and light parsing, no TypeScript compiler), so unusual patterns may be missed; the inventory marks what it could not parse.
