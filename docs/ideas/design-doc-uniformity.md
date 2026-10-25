@@ -188,6 +188,8 @@ ratios.
 - HTML reader and location? → **Team, committed at `docs/design/`** (answered 2026-10-25).
 - Decisions source? → **Proposed by init, confirmed by the user** (answered 2026-10-25).
 - Variables-first focus? → **Yes: extremely variable-driven for global change, combining Tailwind and Bootstrap strengths** (user, 2026-10-25). Interpreted as patterns, not installing both frameworks.
+- Should init generate token files? → **Document + enforce + propose**: init proposes a `tokens.css` / Tailwind `@theme inline` (or `--bs-*`) diff the user accepts, extending today's "apply accepted token changes" step (`skills/design-system/SKILL.md:36`); it never owns or silently rewrites project token files (answered 2026-10-25, resumed session).
+- Component-variable tier? → **Yes, optional per component**: only components with real variants or brand overrides get a `## Component tokens` block, each entry aliasing a semantic token, never a literal (answered 2026-10-25, resumed session). Confirms rec. 2.
 - Open: must Tailwind v3 (JS config) projects get ratios, or is v4/CSS-variables/RN enough? Settle with the spike in rec. 7.
 - Open: is the live-tweak panel in the HTML wanted in slice 1, or later?
 
