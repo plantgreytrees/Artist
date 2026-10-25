@@ -5,15 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  parseArgs,
-  isLoopback,
-  summariseCwv,
-  exitCodeFor,
-  resolveDeps,
-  reportPathFor,
-  run,
-} from "./verify.mjs";
+import { parseArgs, isLoopback, summariseCwv, exitCodeFor, resolveDeps, reportPathFor, run } from "./verify.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(here, "fixtures");
@@ -133,7 +125,9 @@ describe("launch failure", () => {
     const res = await run({
       url: "http://127.0.0.1:1/",
       project: tmp("artist-proj-"),
-      launch: () => { throw new Error("no browser"); },
+      launch: () => {
+        throw new Error("no browser");
+      },
     });
     assert.equal(res.exitCode, 2);
     assert.match(res.error || "", /no browser/);
@@ -146,18 +140,13 @@ describe("exitCodeFor", () => {
     cwv: { lcp_ms: 1000, cls: 0.01, unstable: false },
   };
   test("0 when all thresholds met", () => assert.equal(exitCodeFor(good), 0));
-  test("1 when axe serious present", () =>
-    assert.equal(exitCodeFor({ ...good, axe: { ...good.axe, serious: 1 } }), 1));
-  test("1 when LCP too slow", () =>
-    assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, lcp_ms: 9000 } }), 1));
-  test("1 when CLS too high", () =>
-    assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, cls: 0.9 } }), 1));
-  test("1 when CWV unstable", () =>
-    assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, unstable: true } }), 1));
+  test("1 when axe serious present", () => assert.equal(exitCodeFor({ ...good, axe: { ...good.axe, serious: 1 } }), 1));
+  test("1 when LCP too slow", () => assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, lcp_ms: 9000 } }), 1));
+  test("1 when CLS too high", () => assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, cls: 0.9 } }), 1));
+  test("1 when CWV unstable", () => assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, unstable: true } }), 1));
   test("1 when LCP is null (no LCP or FCP)", () =>
     assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, lcp_ms: null } }), 1));
-  test("2 on tool error", () =>
-    assert.equal(exitCodeFor({ error: new Error("boom") }), 2));
+  test("2 on tool error", () => assert.equal(exitCodeFor({ error: new Error("boom") }), 2));
 });
 
 describe("browser integration", { skip: skipBrowser }, () => {
@@ -244,10 +233,7 @@ describe("browser integration", { skip: skipBrowser }, () => {
     const runsRoot = path.join(project, ".artist", "runs");
     assert.ok(res.runDir.startsWith(runsRoot + path.sep));
     for (const f of listFiles(project)) {
-      assert.ok(
-        f === path.join(project, ".artist") || f === runsRoot || f.startsWith(runsRoot + path.sep),
-        f,
-      );
+      assert.ok(f === path.join(project, ".artist") || f === runsRoot || f.startsWith(runsRoot + path.sep), f);
     }
   });
 });

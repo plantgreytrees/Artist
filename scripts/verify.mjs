@@ -38,12 +38,15 @@ export function parseArgs(argv) {
     else if (out.url === undefined) out.url = arg;
     else throw new Error(`unexpected argument ${arg}`);
   }
-  if (!out.url) throw new Error("usage: verify.mjs <url> [--breakpoints 375,768,1280] [--allow-remote] [--project <dir>]");
+  if (!out.url)
+    throw new Error("usage: verify.mjs <url> [--breakpoints 375,768,1280] [--allow-remote] [--project <dir>]");
   return out;
 }
 
 export function isLoopback(host) {
-  const h = String(host).toLowerCase().replace(/^\[|\]$/g, "");
+  const h = String(host)
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
   if (h === "localhost" || h === "::1") return true;
   const m = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
   return Boolean(m) && m.slice(1).every((o) => Number(o) <= 255);
@@ -80,7 +83,13 @@ export function reportPathFor(result = {}) {
 // The single CWV pass rule, shared with review-html so the page and the exit
 // code can never disagree; an unknown LCP is a miss, never a pass.
 export function cwvPasses(cwv = {}) {
-  return !cwv.unstable && Number.isFinite(cwv.lcp_ms) && cwv.lcp_ms <= THRESHOLDS.lcp_ms && Number.isFinite(cwv.cls) && cwv.cls <= THRESHOLDS.cls;
+  return (
+    !cwv.unstable &&
+    Number.isFinite(cwv.lcp_ms) &&
+    cwv.lcp_ms <= THRESHOLDS.lcp_ms &&
+    Number.isFinite(cwv.cls) &&
+    cwv.cls <= THRESHOLDS.cls
+  );
 }
 
 export function exitCodeFor({ axe, cwv, error } = {}) {
@@ -115,16 +124,25 @@ function loadDeps(dir) {
 function makeRunDir(project) {
   const root = path.join(project, ".artist", "runs");
   fs.mkdirSync(root, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
   for (let suffix = ""; ; suffix = "-" + randomBytes(2).toString("hex")) {
     const dir = path.join(root, stamp + suffix);
-    try { fs.mkdirSync(dir); return dir; } catch (e) { if (e.code !== "EEXIST") throw e; }
+    try {
+      fs.mkdirSync(dir);
+      return dir;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
   }
 }
 
 class RemoteRedirect extends Error {}
 
-const offLoopback = (host) => new RemoteRedirect(`page redirected off loopback to ${host}; pass --allow-remote to measure it`);
+const offLoopback = (host) =>
+  new RemoteRedirect(`page redirected off loopback to ${host}; pass --allow-remote to measure it`);
 
 // Stops a navigation before it leaves loopback: JS-driven navigations are aborted,
 // and HTTP redirects are fetched without following so their Location is checked first.
@@ -138,7 +156,10 @@ async function guardNavigation(context, allowRemote) {
     if (!request.isNavigationRequest()) return route.continue();
     const target = new URL(request.url());
     const main = !state.page || request.frame() === state.page.mainFrame();
-    const block = (host) => { if (main) state.blocked = host; return route.abort("blockedbyclient"); };
+    const block = (host) => {
+      if (main) state.blocked = host;
+      return route.abort("blockedbyclient");
+    };
     if (!isLoopback(target.hostname)) return block(target.hostname);
     const response = await route.fetch({ maxRedirects: 0 });
     const location = response.headers().location;
@@ -189,15 +210,31 @@ async function measureVitals(browser, url, width, deps, allowRemote) {
   }
 }
 
-export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_BREAKPOINTS, allowRemote = false, launch, env = process.env } = {}) {
+export async function run({
+  url,
+  project = process.cwd(),
+  breakpoints = DEFAULT_BREAKPOINTS,
+  allowRemote = false,
+  launch,
+  env = process.env,
+} = {}) {
   let target;
-  try { target = new URL(url); } catch { return { exitCode: 2, error: `not a URL: ${url}` }; }
-  if (target.protocol !== "http:" && target.protocol !== "https:") return { exitCode: 2, error: `only http(s) URLs can be measured, got ${target.protocol}` };
+  try {
+    target = new URL(url);
+  } catch {
+    return { exitCode: 2, error: `not a URL: ${url}` };
+  }
+  if (target.protocol !== "http:" && target.protocol !== "https:")
+    return { exitCode: 2, error: `only http(s) URLs can be measured, got ${target.protocol}` };
   if (!allowRemote && !isLoopback(target.hostname)) {
-    return { exitCode: 2, error: `refusing ${target.hostname}: only loopback URLs are measured unless --allow-remote is passed` };
+    return {
+      exitCode: 2,
+      error: `refusing ${target.hostname}: only loopback URLs are measured unless --allow-remote is passed`,
+    };
   }
   const resolved = resolveDeps(env);
-  if (!resolved.ok) return { exitCode: 2, error: `dependencies missing; install them with: ${resolved.installCommand}` };
+  if (!resolved.ok)
+    return { exitCode: 2, error: `dependencies missing; install them with: ${resolved.installCommand}` };
 
   let deps, browser, runDir;
   try {
@@ -222,7 +259,14 @@ export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_
         const counts = Object.fromEntries(IMPACTS.map((k) => [k, 0]));
         for (const v of result.violations) {
           if (counts[v.impact] !== undefined) counts[v.impact]++;
-          const seen = violations.get(v.id) || { id: v.id, impact: v.impact, help: v.help, nodes: 0, breakpoints: [], targets: [] };
+          const seen = violations.get(v.id) || {
+            id: v.id,
+            impact: v.impact,
+            help: v.help,
+            nodes: 0,
+            breakpoints: [],
+            targets: [],
+          };
           seen.nodes = Math.max(seen.nodes, v.nodes.length);
           seen.breakpoints.push(width);
           for (const n of v.nodes) {
@@ -254,7 +298,11 @@ export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_
     fs.writeFileSync(path.join(runDir, "report.json"), JSON.stringify(report, null, 2) + "\n");
     return { exitCode: exitCodeFor(report), runDir };
   } catch (error) {
-    return { exitCode: 2, runDir, error: error instanceof RemoteRedirect ? error.message : `browser run failed: ${error.message}` };
+    return {
+      exitCode: 2,
+      runDir,
+      error: error instanceof RemoteRedirect ? error.message : `browser run failed: ${error.message}`,
+    };
   } finally {
     if (browser) await browser.close().catch(() => {});
   }
@@ -263,7 +311,12 @@ export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_
 const invokedDirectly = process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invokedDirectly) {
   let args;
-  try { args = parseArgs(process.argv.slice(2)); } catch (e) { console.error(`verify: ${e.message}`); process.exitCode = 2; }
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (e) {
+    console.error(`verify: ${e.message}`);
+    process.exitCode = 2;
+  }
   if (args) {
     const result = await run({ ...args, project: args.project || process.cwd() });
     if (result.error) console.error(`verify: ${result.error}`);

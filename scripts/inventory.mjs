@@ -3,7 +3,17 @@
 // <project>/docs/design/inventory.json and rewrites only the marked section of
 // <project>/docs/design/DESIGN.md (falls back to <project>/DESIGN.md when the
 // former does not exist). Exit 0 on success, 2 on error.
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, readdirSync, realpathSync, lstatSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readdirSync,
+  realpathSync,
+  lstatSync,
+} from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
@@ -52,14 +62,17 @@ function parseMembers(body) {
     if (!m) continue;
     const type = m[3];
     const lits = type.split("|").map((s) => s.trim());
-    const values = lits.length > 1 && lits.every((s) => /^(["'`]).*\1$/.test(s)) ? lits.map((s) => s.slice(1, -1)) : undefined;
+    const values =
+      lits.length > 1 && lits.every((s) => /^(["'`]).*\1$/.test(s)) ? lits.map((s) => s.slice(1, -1)) : undefined;
     props.push({ name: m[1], type, optional: !!m[2], ...(values ? { values } : {}) });
   }
   return props;
 }
 
 function propsFor(content, name) {
-  const decl = new RegExp(`(?:type\\s+${name}Props\\s*=\\s*|interface\\s+${name}Props\\s*(?:extends[^{]+)?)\\{`).exec(content);
+  const decl = new RegExp(`(?:type\\s+${name}Props\\s*=\\s*|interface\\s+${name}Props\\s*(?:extends[^{]+)?)\\{`).exec(
+    content,
+  );
   if (decl) {
     const body = balanced(content, decl.index + decl[0].length - 1);
     if (body != null) return parseMembers(body);
@@ -81,12 +94,15 @@ const exportedNames = (content) => {
 };
 
 function isDeprecated(content, name, designMd) {
-  const m = new RegExp(`/\\*\\*(?:(?!\\*/)[\\s\\S])*@deprecated(?:(?!\\*/)[\\s\\S])*\\*/\\s*export\\s+(?:default\\s+)?(?:function|const|class)\\s+${name}\\b`).test(content);
+  const m = new RegExp(
+    `/\\*\\*(?:(?!\\*/)[\\s\\S])*@deprecated(?:(?!\\*/)[\\s\\S])*\\*/\\s*export\\s+(?:default\\s+)?(?:function|const|class)\\s+${name}\\b`,
+  ).test(content);
   if (m) return true;
   if (!designMd) return false;
-  const outside = designMd.includes(START) && designMd.includes(END)
-    ? designMd.slice(0, designMd.indexOf(START)) + designMd.slice(designMd.indexOf(END) + END.length)
-    : designMd;
+  const outside =
+    designMd.includes(START) && designMd.includes(END)
+      ? designMd.slice(0, designMd.indexOf(START)) + designMd.slice(designMd.indexOf(END) + END.length)
+      : designMd;
   return outside.split(/\r?\n/).some((l) => /deprecated/i.test(l) && new RegExp(`\\b${name}\\b`).test(l));
 }
 
@@ -127,12 +143,16 @@ export function buildInventory(files, { designMd = "" } = {}) {
             pkgs.set(name, e);
           }
         }
-      } catch (e) { unparsed.push({ path, reason: `invalid JSON: ${e.message}` }); }
+      } catch (e) {
+        unparsed.push({ path, reason: `invalid JSON: ${e.message}` });
+      }
       continue;
     }
     if (path.endsWith(".json")) {
       let j;
-      try { j = JSON.parse(content); } catch (e) {
+      try {
+        j = JSON.parse(content);
+      } catch (e) {
         if (/\.schema\.json$/.test(path)) unparsed.push({ path, reason: `invalid JSON: ${e.message}` });
         continue;
       }
@@ -151,7 +171,11 @@ export function buildInventory(files, { designMd = "" } = {}) {
     if (/(^|\/)layout\.(tsx|jsx|ts|js)$/.test(path)) {
       const names = exportedNames(content);
       const def = /export\s+default\s+(?:async\s+)?function\s+([A-Za-z0-9_$]+)/.exec(content);
-      layouts.push({ name: def?.[1] ?? names[0] ?? posix.basename(posix.dirname(path)), path, routes: layoutRoutes(path, pagePaths) });
+      layouts.push({
+        name: def?.[1] ?? names[0] ?? posix.basename(posix.dirname(path)),
+        path,
+        routes: layoutRoutes(path, pagePaths),
+      });
     } else if (isTsx(path) && !ROUTE_FILE.test(path)) {
       const names = exportedNames(content);
       if (!names.length) unparsed.push({ path, reason: "no exported component found" });
@@ -160,7 +184,10 @@ export function buildInventory(files, { designMd = "" } = {}) {
         const variants = {};
         for (const p of props) if (p.values) variants[p.name] = p.values;
         components.push({
-          name, path, props, variants,
+          name,
+          path,
+          props,
+          variants,
           tokensUsed: uniqSorted([...content.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1])),
           usage: { count: 0, files: [] },
           status: isDeprecated(content, name, designMd) ? "deprecated" : "current",
@@ -168,7 +195,9 @@ export function buildInventory(files, { designMd = "" } = {}) {
       }
     }
 
-    for (const m of content.matchAll(/(?:export\s+)?(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(z|yup|Yup)\.object\s*\(\s*\{/g)) {
+    for (const m of content.matchAll(
+      /(?:export\s+)?(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*(z|yup|Yup)\.object\s*\(\s*\{/g,
+    )) {
       const open = m.index + m[0].length - 1;
       const body = balanced(content, open);
       if (body == null) unparsed.push({ path, reason: `unbalanced ${m[2]}.object for ${m[1]}` });
@@ -180,7 +209,16 @@ export function buildInventory(files, { designMd = "" } = {}) {
       const rest = content.slice(m.index + m[0].length);
       const br = /^[^{;]*?\{/.exec(rest);
       const body = br ? balanced(content, m.index + m[0].length + br[0].length - 1) : null;
-      schemas.push({ kind: "ts-type", name: m[1], path, fields: body ? parseMembers(body).map((p) => p.name).sort(cmp) : [] });
+      schemas.push({
+        kind: "ts-type",
+        name: m[1],
+        path,
+        fields: body
+          ? parseMembers(body)
+              .map((p) => p.name)
+              .sort(cmp)
+          : [],
+      });
     }
   }
 
@@ -193,17 +231,22 @@ export function buildInventory(files, { designMd = "" } = {}) {
       const imported = new RegExp(`import\\s+(?:[^;]*?[{,\\s])?${c.name}\\b[^;]*?from\\s+["']`).test(f.content);
       if (!imported) continue;
       const n = [...f.content.matchAll(new RegExp(`<${c.name}(?=[\\s/>])`, "g"))].length;
-      if (n) { count += n; files.add(f.path); }
+      if (n) {
+        count += n;
+        files.add(f.path);
+      }
     }
     c.usage = { count, files: [...files].sort(cmp) };
   }
 
-  const packages = [...pkgs.values()].map((e) => ({
-    name: e.name,
-    version: [...e.versions].sort(cmp).join(", "),
-    capability: capOf(e.name),
-    sources: [...e.sources].sort(cmp),
-  })).sort((a, b) => cmp(a.name, b.name));
+  const packages = [...pkgs.values()]
+    .map((e) => ({
+      name: e.name,
+      version: [...e.versions].sort(cmp).join(", "),
+      capability: capOf(e.name),
+      sources: [...e.sources].sort(cmp),
+    }))
+    .sort((a, b) => cmp(a.name, b.name));
 
   const byKey = (a, b) => cmp(a.path + "\0" + a.name, b.path + "\0" + b.name);
   return {
@@ -219,46 +262,81 @@ export function buildInventory(files, { designMd = "" } = {}) {
 // top-level keys of an object literal body
 function depth0(body) {
   const keys = [];
-  let depth = 0, start = 0;
-  const flush = (s) => { const m = /^\s*([A-Za-z_$][\w$]*)\s*:/.exec(s); if (m) keys.push(m[1]); };
+  let depth = 0,
+    start = 0;
+  const flush = (s) => {
+    const m = /^\s*([A-Za-z_$][\w$]*)\s*:/.exec(s);
+    if (m) keys.push(m[1]);
+  };
   for (let i = 0; i < body.length; i++) {
     const ch = body[i];
     if ("({[".includes(ch)) depth++;
     else if (")}]".includes(ch)) depth--;
-    else if (ch === "," && depth === 0) { flush(body.slice(start, i)); start = i + 1; }
+    else if (ch === "," && depth === 0) {
+      flush(body.slice(start, i));
+      start = i + 1;
+    }
   }
   flush(body.slice(start));
   return keys.sort(cmp);
 }
 
-const cell = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+const cell = (s) =>
+  String(s ?? "")
+    .replace(/\|/g, "\\|")
+    .replace(/\r?\n/g, " ");
 const table = (head, rows) =>
-  [`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`, ...rows.map((r) => `| ${r.map(cell).join(" | ")} |`)].join("\n");
+  [
+    `| ${head.join(" | ")} |`,
+    `| ${head.map(() => "---").join(" | ")} |`,
+    ...rows.map((r) => `| ${r.map(cell).join(" | ")} |`),
+  ].join("\n");
 
 export function renderSections(inv) {
   const comps = table(
     ["name", "path", "props", "variants", "tokens", "used", "status"],
     inv.components.map((c) => [
-      c.name, c.path,
+      c.name,
+      c.path,
       c.props.map((p) => p.name + (p.optional ? "?" : "")).join(", "),
-      Object.entries(c.variants).map(([k, v]) => `${k}: ${v.join(" / ")}`).join("; "),
+      Object.entries(c.variants)
+        .map(([k, v]) => `${k}: ${v.join(" / ")}`)
+        .join("; "),
       c.tokensUsed.join(", "),
       `${c.usage.count} in ${c.usage.files.length} file${c.usage.files.length === 1 ? "" : "s"}`,
       c.status,
     ]),
   );
-  const lays = table(["name", "path", "routes"], inv.layouts.map((l) => [l.name, l.path, l.routes.join(", ")]));
-  const schs = table(["name", "path", "kind", "fields"], inv.schemas.map((s) => [s.name, s.path, s.kind, s.fields.join(", ")]));
-  const pks = table(["package", "version", "capability"], inv.packages.map((p) => [p.name, p.version, p.capability ?? ""]));
+  const lays = table(
+    ["name", "path", "routes"],
+    inv.layouts.map((l) => [l.name, l.path, l.routes.join(", ")]),
+  );
+  const schs = table(
+    ["name", "path", "kind", "fields"],
+    inv.schemas.map((s) => [s.name, s.path, s.kind, s.fields.join(", ")]),
+  );
+  const pks = table(
+    ["package", "version", "capability"],
+    inv.packages.map((p) => [p.name, p.version, p.capability ?? ""]),
+  );
   const tail = inv.unparsed.length
-    ? `\n\n## Unparsed\n\n${table(["path", "reason"], inv.unparsed.map((u) => [u.path, u.reason]))}`
+    ? `\n\n## Unparsed\n\n${table(
+        ["path", "reason"],
+        inv.unparsed.map((u) => [u.path, u.reason]),
+      )}`
     : "";
   return `## Components\n\n${comps}\n\n## Layouts\n\n${lays}\n\n## Schemas\n\n${schs}\n\n## Packages\n\n${pks}${tail}\n`;
 }
 
 const SKIP_DIRS = new Set(["node_modules", ".artist", ".git", ".worktrees"]);
 const skipped = (rel) => rel.split("/").some((seg) => SKIP_DIRS.has(seg));
-const isRegular = (abs) => { try { return lstatSync(abs).isFile(); } catch { return false; } };
+const isRegular = (abs) => {
+  try {
+    return lstatSync(abs).isFile();
+  } catch {
+    return false;
+  }
+};
 // Build output the walk never descends into, even without a .gitignore.
 const WALK_SKIP = new Set([...SKIP_DIRS, "dist", "build", "out", ".next", ".turbo", "coverage"]);
 
@@ -270,10 +348,23 @@ function ownIgnored(project, names) {
   const gitDir = mkdtempSync(join(tmpdir(), "artist-ignore-"));
   try {
     execFileSync("git", ["init", "-q", "--bare", gitDir], { stdio: "pipe" });
-    const out = execFileSync("git", ["--git-dir", gitDir, "--work-tree", project, "check-ignore", "--no-index", "-z", "--stdin"],
-      { cwd: project, input: names.join("\0") + "\0", encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "pipe"] });
+    const out = execFileSync(
+      "git",
+      ["--git-dir", gitDir, "--work-tree", project, "check-ignore", "--no-index", "-z", "--stdin"],
+      {
+        cwd: project,
+        input: names.join("\0") + "\0",
+        encoding: "utf8",
+        maxBuffer: 1 << 28,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     return new Set(out.split("\0").filter(Boolean));
-  } catch { return new Set(); } finally { rmSync(gitDir, { recursive: true, force: true }); }
+  } catch {
+    return new Set();
+  } finally {
+    rmSync(gitDir, { recursive: true, force: true });
+  }
 }
 
 // Every existing regular project file, relative posix paths, sorted. In a git
@@ -285,18 +376,30 @@ export function listProjectFiles(project) {
   let names = null;
   try {
     execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: project, stdio: "pipe" });
-    const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], { cwd: project, encoding: "utf8", maxBuffer: 1 << 28 });
+    const out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+      cwd: project,
+      encoding: "utf8",
+      maxBuffer: 1 << 28,
+    });
     names = out.split("\0").filter(Boolean);
     // A project folder its parent repo ignores lists nothing; walk it instead.
     let ignored = false;
-    try { execFileSync("git", ["check-ignore", "-q", "."], { cwd: project, stdio: "pipe" }); ignored = true; } catch {}
+    try {
+      execFileSync("git", ["check-ignore", "-q", "."], { cwd: project, stdio: "pipe" });
+      ignored = true;
+    } catch {}
     if (ignored || (!names.length && readdirSync(project).length)) names = null;
-  } catch { names = null; }
+  } catch {
+    names = null;
+  }
   if (names === null) {
     names = [];
     const rec = (dir) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
-        if (e.isDirectory()) { if (!WALK_SKIP.has(e.name)) rec(join(dir, e.name)); continue; }
+        if (e.isDirectory()) {
+          if (!WALK_SKIP.has(e.name)) rec(join(dir, e.name));
+          continue;
+        }
         if (e.isFile()) names.push(relative(project, join(dir, e.name)).split(sep).join("/"));
       }
     };
@@ -314,7 +417,8 @@ function walk(root) {
 }
 
 export function replaceMarked(md, section) {
-  const s = md.indexOf(START), e = md.indexOf(END);
+  const s = md.indexOf(START),
+    e = md.indexOf(END);
   if (s < 0 || e < s) throw new Error(`DESIGN.md has no ${START} / ${END} markers`);
   return md.slice(0, s + START.length) + "\n\n" + section + "\n" + md.slice(e);
 }
@@ -339,5 +443,10 @@ function main() {
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { process.exitCode = main(); } catch (e) { console.error(`inventory: ${e.message}`); process.exitCode = 2; }
+  try {
+    process.exitCode = main();
+  } catch (e) {
+    console.error(`inventory: ${e.message}`);
+    process.exitCode = 2;
+  }
 }
