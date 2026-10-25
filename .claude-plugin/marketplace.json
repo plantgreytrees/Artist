@@ -1,0 +1,11 @@
+{
+  "name": "artist-marketplace",
+  "owner": { "name": "Kieran" },
+  "plugins": [
+    {
+      "name": "artist",
+      "source": "./",
+      "description": "Designs, builds, measures and refines web and mobile UI until it meets a scored quality bar."
+    }
+  ]
+}
