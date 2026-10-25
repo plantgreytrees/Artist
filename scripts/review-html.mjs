@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Self-contained review.html renderer (ARCH-VERIFY-10, ARCH-VERIFY-13)
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, realpathSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { THRESHOLDS } from "./verify.mjs";
 
 export const DIMENSIONS = ["Hierarchy", "Typography", "Spacing & rhythm", "Colour & contrast", "Distinctiveness", "Responsiveness", "Accessibility", "Motion"];
 
@@ -12,7 +13,8 @@ const relPath = (outDir, runDir, file) => relative(resolve(outDir), join(resolve
 function readReuse(runDir) {
   const p = join(runDir, "reuse.json");
   if (!existsSync(p)) return null;
-  try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; }
+  // An unreadable reuse.json must never let the verdict read PASS.
+  try { return JSON.parse(readFileSync(p, "utf8")); } catch { return { unreadable: true }; }
 }
 
 function slider(bp, before, after, i) {
@@ -36,6 +38,7 @@ function rubric(r, n) {
 
 function reuseSection(reuse) {
   if (!reuse) return "";
+  if (reuse.unreadable) return `<section><h2>Reuse findings</h2><p class="warn">reuse.json unreadable: rerun reuse-check.</p></section>`;
   const groups = [["New components", "new_components"], ["New layouts", "new_layouts"], ["Raw colours", "raw_colours"], ["New packages", "new_packages"]];
   const rows = groups.map(([t, k]) => {
     const items = reuse[k] || [];
@@ -70,9 +73,9 @@ function passes(round, reuse) {
   const rep = round.report;
   const cwv = rep.cwv || {};
   if ((rep.axe?.critical || 0) + (rep.axe?.serious || 0) > 0) return false;
-  if (cwv.unstable || !(cwv.lcp_ms <= 2500) || !(cwv.cls <= 0.1)) return false;
+  if (cwv.unstable || !(cwv.lcp_ms <= THRESHOLDS.lcp_ms) || !(cwv.cls <= THRESHOLDS.cls)) return false;
   if (round.scores && DIMENSIONS.some((d) => !(Number(round.scores[d]) >= 4))) return false;
-  return !(reuse && reuse.unjustified > 0);
+  return !(reuse && (reuse.unreadable || reuse.unjustified > 0));
 }
 
 export function renderReview({ rounds, tokenDiff, outDir }) {
@@ -90,12 +93,12 @@ export function renderReview({ rounds, tokenDiff, outDir }) {
     return slider(bp, b ? relPath(outDir, prev.runDir, b) : null, relPath(outDir, latest.runDir, after), i);
   }).join("");
   const axe = rep.axe || {};
-  const vio = (axe.violations || []).map((v) => `<tr><td>${esc(v.id)}</td><td>${esc(v.impact)}</td><td>${esc(v.help)}</td><td>${esc(v.nodes)}</td><td>${esc((v.breakpoints || []).join(", "))}</td></tr>`).join("");
+  const vio = (axe.violations || []).map((v) => `<tr><td>${esc(v.id)}</td><td>${esc(v.impact)}</td><td>${esc(v.help)}</td><td>${esc(v.nodes)}</td><td>${esc((v.breakpoints || []).join(", "))}</td><td>${(v.targets || []).map((t) => `<code>${esc(t)}</code>`).join("<br>")}</td></tr>`).join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Review: ${esc(rep.url)}</title><style>${CSS}</style></head><body>
 <header><h1>Design review</h1><p>URL: ${esc(rep.url)}<br>Time: ${esc(rep.generated_at)}<br>Final verdict: <strong>${verdict}</strong></p></header>
 <section><h2>Before / after</h2>${cmp || "<p>No screenshots.</p>"}</section>
 <section><h2>Rubric</h2>${rounds.map((r, i) => rubric(r, i + 1)).join("")}</section>
-<section><h2>Accessibility (axe)</h2><p>Critical ${esc(axe.critical ?? 0)}, serious ${esc(axe.serious ?? 0)}, moderate ${esc(axe.moderate ?? 0)}, minor ${esc(axe.minor ?? 0)}</p>${vio ? `<table><thead><tr><th>Rule</th><th>Impact</th><th>Help</th><th>Nodes</th><th>Breakpoints</th></tr></thead><tbody>${vio}</tbody></table>` : "<p>No violations.</p>"}</section>
+<section><h2>Accessibility (axe)</h2><p>Critical ${esc(axe.critical ?? 0)}, serious ${esc(axe.serious ?? 0)}, moderate ${esc(axe.moderate ?? 0)}, minor ${esc(axe.minor ?? 0)}</p>${vio ? `<table><thead><tr><th>Rule</th><th>Impact</th><th>Help</th><th>Nodes</th><th>Breakpoints</th><th>Elements</th></tr></thead><tbody>${vio}</tbody></table>` : "<p>No violations.</p>"}</section>
 <section><h2>Core Web Vitals</h2><p>LCP median: ${esc(cwv.lcp_ms)} ms, CLS: ${esc(cwv.cls)}, runs: ${esc(cwv.runs)}, spread: ${esc(cwv.spread)}</p>${cwv.unstable ? '<p class="warn">Unstable: CWV not treated as passed.</p>' : "<p>Stable.</p>"}</section>
 ${tokenSection(tokenDiff)}
 ${reuseSection(reuse)}
@@ -120,6 +123,6 @@ function main(argv) {
   } else throw new Error("usage: review-html.mjs <runDir> | --rounds <rounds.json> --out <dir>");
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { main(process.argv.slice(2)); } catch (e) { console.error(e.message); process.exit(2); }
 }
