@@ -84,6 +84,33 @@ test("before is the first round, after is the last", () => {
   assert.ok(!html.includes('src="../2026-01-02T00/375.png"'));
 });
 
+test("corrupt reuse.json is shown as unreadable and fails the verdict", async () => {
+  const { b } = setup(false);
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(join(b, "reuse.json"), "{not json");
+  const html = renderReview({ rounds: [{ runDir: b, report: good(), scores: fours }], outDir: b });
+  assert.match(html, /reuse\.json unreadable/);
+  assert.equal(verdictOf(html), "NEEDS WORK");
+});
+
+test("violation targets are rendered and escaped", () => {
+  const { b } = setup(false);
+  const r = good();
+  r.axe.serious = 1;
+  r.axe.violations = [{ id: "color-contrast", impact: "serious", help: "Contrast", nodes: 1, breakpoints: [375], targets: ["main > a.cta<x>"] }];
+  const html = renderReview({ rounds: [{ runDir: b, report: r }], outDir: b });
+  assert.ok(html.includes("main &gt; a.cta&lt;x&gt;"));
+});
+
+test("CLI works when invoked through a symlinked directory", async () => {
+  const { b, root } = setup(false);
+  const { symlinkSync } = await import("node:fs");
+  const link = join(root, "linked-scripts");
+  symlinkSync(here, link);
+  execFileSync("node", [join(link, "review-html.mjs"), b]);
+  assert.ok(existsSync(join(b, "review.html")));
+});
+
 test("CLI one-round form writes review.html", () => {
   const { b } = setup(true);
   execFileSync("node", [join(here, "review-html.mjs"), b]);
