@@ -5,6 +5,8 @@ import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { buildInventory, capOf, formatOf, listProjectFiles } from "./inventory.mjs";
+import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf } from "./design-md.mjs";
+import { resolveClass } from "./token-refs.mjs";
 
 function sections(md) {
   const out = {};
@@ -167,6 +169,36 @@ const propSet = (c) => new Set((c.props || []).map((p) => p.name));
 const SCAN_EXT = /\.(js|jsx|ts|tsx|mjs|cjs|css|scss|sass|less|vue|svelte|html)$/i;
 const isDesignDoc = (p) => /(^|\/)docs\/design\//.test(p);
 
+const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
+const STRING_LIT = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
+const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// Bound variables a file references: CSS var(), Tailwind v4 utilities, RN member chains.
+function varRefs(content, ctx) {
+  const out = new Set();
+  for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
+  if (!ctx.tokens.length) return out;
+  for (const m of content.matchAll(STRING_LIT)) {
+    for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+      if (!cls || cls.length > 120) continue;
+      const r = resolveClass(cls, ctx);
+      if (r.kind === "token") for (const v of r.variables) out.add(v);
+    }
+  }
+  for (const m of content.matchAll(RN_ROOT)) {
+    const segs = m[0].split(".");
+    const cands = new Set(segs.map((_, i) => segs.slice(i).join(".")));
+    for (const t of ctx.tokens) if (t.kind === "semantic" && cands.has(t.name)) out.add(t.variable);
+  }
+  return out;
+}
+
+const ratio = (conforming, items) => {
+  const justified = items.filter((x) => x.justified).length;
+  const unjustified = items.length - justified;
+  return { conforming, justified, unjustified, total: conforming + justified + unjustified };
+};
+
 const ROUTE_FILES = /^(page|layout|template|loading|error|not-found|route|default|_layout|_app|_document|index)\./;
 
 export function checkReuse({ designMd, files, justifications = {}, all = false, inventory = null }) {
@@ -180,7 +212,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
   const pkgs = new Map((sec.Packages || []).map((r) => [r[0], r[2] || ""]));
 
   const res = {
-    schema: 2,
+    schema: 3,
     new_components: [],
     new_layouts: [],
     raw_colours: [],
@@ -195,6 +227,15 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     res.near_duplicates = [];
   }
   const seenComp = new Set();
+  const tokenTexts = all
+    ? files.filter((f) => isTokenFile(tokFiles, f.path.replace(/\\/g, "/"))).map((f) => f.content)
+    : [];
+  const tctx = { tokens: all ? bindTokens(designMd) : [], spacingPx: spacingBaseOf(tokenTexts) };
+  const varCat = new Map(tctx.tokens.map((t) => [t.variable, t.category]));
+  const conforming = { colours: new Set(), spacing: new Set(), motion: new Set() };
+  const offClasses = [];
+  const offSeen = new Set();
+  let animatedConforming = 0;
 
   for (const f of files) {
     const p = f.path.replace(/\\/g, "/");
@@ -259,6 +300,22 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     if (ANIMATED.some((re) => re.test(f.content)) && !REDUCED.test(f.content)) {
       const idx = Math.min(...ANIMATED.map((re) => re.exec(f.content)?.index ?? Infinity));
       res.missing_reduced_motion.push(justify({ name: p, file: p, line: lineOf(f.content, idx) }, justifications));
+    } else if (ANIMATED.some((re) => re.test(f.content))) animatedConforming++;
+    if (all) {
+      for (const v of varRefs(f.content, tctx)) {
+        const cat = varCat.get(v);
+        if (conforming[cat]) conforming[cat].add(p + "\0" + v);
+      }
+      if (tctx.tokens.length)
+        for (const m of f.content.matchAll(STRING_LIT)) {
+          for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+            if (!cls || cls.length > 120 || offSeen.has(cls)) continue;
+            const r = resolveClass(cls, tctx);
+            if (r.kind !== "unknown" && r.kind !== "ambiguous") continue;
+            offSeen.add(cls);
+            offClasses.push({ class: cls, reason: r.kind, file: p, line: lineOf(f.content, m.index) });
+          }
+        }
     }
   }
   if (all) {
@@ -279,6 +336,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
       )
       .map((f) => ({ path: f.path.replace(/\\/g, "/"), content: f.content }));
     const cur = buildInventory(code, { designMd }).components;
+    ratiosOf(res, { cur, designMd, justifications, conforming, animatedConforming, offClasses });
     // Generic wrapper props say nothing about duplication; need ≥2 meaningful props.
     const GENERIC = new Set(["children", "className"]);
     const sets = new Map(cur.map((c) => [c, new Set([...propSet(c)].filter((n) => !GENERIC.has(n)))]));
@@ -300,6 +358,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     }
   }
   for (const k of [
+    "component_token_literals",
     "new_components",
     "new_layouts",
     "raw_colours",
@@ -312,6 +371,90 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
   ])
     res.unjustified += (res[k] || []).filter((x) => !x.justified).length;
   return res;
+}
+
+// --all only: ratios, component_token_literals and the advisory lists (ARCH-VERIFY-22).
+function ratiosOf(res, { cur, designMd, justifications, conforming, animatedConforming, offClasses }) {
+  const t = tokensOf(designMd);
+  const known = new Set([...t.semantic, ...t.typeScale, ...t.spacing, ...t.motion].map((r) => r.name).filter(Boolean));
+  const block = componentTokensOf(designMd);
+  res.component_token_literals = [];
+  for (const r of block) {
+    if (!r.component || known.has(r.semantic)) continue;
+    res.component_token_literals.push(
+      justify({ name: `${r.component}.${r.variable}`, value: r.semantic, component: r.component }, justifications),
+    );
+  }
+  const litBy = (name) => res.component_token_literals.filter((x) => x.component === name);
+  const ct = { conforming: 0, items: [] };
+  for (const c of cur) {
+    if (!Object.keys(c.variants || {}).length) continue;
+    const rows = block.filter((r) => r.component === c.name);
+    const lits = litBy(c.name);
+    if (rows.length && !lits.length) ct.conforming++;
+    else {
+      const item = justify({ name: c.name, file: c.path, line: 1 }, justifications);
+      if (!item.justified && lits.length && lits.every((l) => l.justified)) item.justified = true;
+      ct.items.push(item);
+    }
+  }
+  const byProp = new Map();
+  for (const c of cur)
+    for (const [prop, vals] of Object.entries(c.variants || {})) {
+      if (!byProp.has(prop)) byProp.set(prop, []);
+      byProp.get(prop).push({ c, joined: [...vals].sort(cmpStr).join(",") });
+    }
+  const api = { conforming: 0, items: [] };
+  const synonyms = new Map();
+  for (const [prop, list] of [...byProp].sort((a, b) => cmpStr(a[0], b[0]))) {
+    const synKey = (e) => e.joined;
+    for (const e of list) {
+      if (e.joined.split(",").length < 2) continue;
+      const g = synonyms.get(synKey(e)) ?? new Map();
+      if (!g.has(prop)) g.set(prop, new Set());
+      g.get(prop).add(e.c.name);
+      synonyms.set(synKey(e), g);
+    }
+    if (list.length < 2) continue;
+    const freq = new Map();
+    for (const e of list) freq.set(e.joined, (freq.get(e.joined) ?? 0) + 1);
+    const best = [...freq].sort((a, b) => b[1] - a[1] || cmpStr(a[0], b[0]))[0][0];
+    for (const e of list) {
+      if (e.joined === best) api.conforming++;
+      else
+        api.items.push(
+          justify(
+            {
+              name: `${e.c.name}.${prop}`,
+              file: e.c.path,
+              line: 1,
+              values: e.joined.split(","),
+              expected: best.split(","),
+            },
+            justifications,
+          ),
+        );
+    }
+  }
+  const mkRatio = (cat, raw) => ratio(conforming[cat].size, raw);
+  const rm = res.missing_reduced_motion;
+  res.ratios = {
+    colours: mkRatio("colours", res.raw_colours),
+    spacing: mkRatio("spacing", res.raw_spacing),
+    motion: mkRatio("motion", res.raw_motion),
+    reduced_motion: ratio(animatedConforming, rm),
+    component_tokens: ratio(ct.conforming, ct.items),
+    component_api: ratio(api.conforming, api.items),
+  };
+  res.off_token_classes = offClasses;
+  res.prop_synonyms = [...synonyms]
+    .filter(([, g]) => g.size >= 2)
+    .map(([joined, g]) => ({
+      props: [...g.keys()].sort(cmpStr),
+      values: joined.split(","),
+      components: [...new Set([...g.values()].flatMap((s) => [...s]))].sort(cmpStr),
+    }))
+    .sort((a, b) => cmpStr(a.values.join(","), b.values.join(",")));
 }
 
 function parseArgs(argv) {

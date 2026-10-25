@@ -105,6 +105,17 @@ test("reuse findings render spacing, motion, reduced motion, stale and near-dupl
   assert.ok(html.includes("&lt;b&gt;x&lt;/b&gt;"));
 });
 
+test("a schema 3 reuse.json (with --all keys) renders the same reuse findings", () => {
+  const { b } = setup(false);
+  copyFileSync(fx("reuse/reuse.sample3.json"), join(b, "reuse.json"));
+  const html = renderReview({ rounds: [{ runDir: b, report: rep() }], outDir: b });
+  assert.ok(html.includes("Reuse findings"));
+  for (const h of ["Raw spacing", "Raw motion", "Missing reduced motion", "Stale inventory", "Near-duplicates"])
+    assert.ok(html.includes(`<h3>${h}</h3>`), h);
+  for (const s of ["13px", "0.42s", "OldBanner", "PriceCard"]) assert.ok(html.includes(s), s);
+  assert.ok(html.includes("Unjustified: 9"));
+});
+
 test("a schema 1 reuse.json without the new categories still renders", () => {
   const { b } = setup(false);
   writeFileSync(join(b, "reuse.json"), JSON.stringify({ schema: 1, new_components: [], unjustified: 0 }));

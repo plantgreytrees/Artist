@@ -1,0 +1,152 @@
+{
+ "schema": 3,
+ "new_components": [
+  {
+   "name": "FancyCard",
+   "file": "src/FancyCard.tsx",
+   "line": 1,
+   "justified": true,
+   "reason": "no existing card fits"
+  }
+ ],
+ "new_layouts": [
+  {
+   "name": "SplitLayout",
+   "file": "src/SplitLayout.tsx",
+   "line": 1,
+   "justified": false
+  }
+ ],
+ "raw_colours": [
+  {
+   "value": "#123456",
+   "file": "src/a.css",
+   "line": 4,
+   "justified": false
+  }
+ ],
+ "raw_spacing": [
+  {
+   "value": "13px",
+   "file": "src/spacing.css",
+   "line": 2,
+   "justified": false
+  }
+ ],
+ "raw_motion": [
+  {
+   "value": "0.42s",
+   "file": "src/motion.css",
+   "line": 3,
+   "justified": false
+  }
+ ],
+ "missing_reduced_motion": [
+  {
+   "name": "src/FadeIn.tsx",
+   "file": "src/FadeIn.tsx",
+   "line": 5,
+   "justified": false
+  }
+ ],
+ "new_packages": [
+  {
+   "name": "recharts",
+   "file": "package.json",
+   "line": 9,
+   "justified": false,
+   "duplicates": "chart.js"
+  }
+ ],
+ "stale_inventory": [
+  {
+   "name": "OldBanner",
+   "file": "src/components/OldBanner.tsx",
+   "line": 1,
+   "justified": false
+  }
+ ],
+ "near_duplicates": [
+  {
+   "name": "PriceCard",
+   "file": "src/components/PriceCard.tsx",
+   "line": 1,
+   "justified": false,
+   "duplicates": [
+    "PricingCard",
+    "<b>x</b>"
+   ]
+  }
+ ],
+ "unjustified": 9,
+ "component_token_literals": [
+  {
+   "name": "Chip.--chip-bg",
+   "value": "#ff00ff",
+   "component": "Chip",
+   "justified": false
+  }
+ ],
+ "ratios": {
+  "colours": {
+   "conforming": 3,
+   "justified": 0,
+   "unjustified": 1,
+   "total": 4
+  },
+  "spacing": {
+   "conforming": 2,
+   "justified": 0,
+   "unjustified": 1,
+   "total": 3
+  },
+  "motion": {
+   "conforming": 1,
+   "justified": 0,
+   "unjustified": 1,
+   "total": 2
+  },
+  "reduced_motion": {
+   "conforming": 0,
+   "justified": 0,
+   "unjustified": 1,
+   "total": 1
+  },
+  "component_tokens": {
+   "conforming": 0,
+   "justified": 1,
+   "unjustified": 1,
+   "total": 2
+  },
+  "component_api": {
+   "conforming": 1,
+   "justified": 0,
+   "unjustified": 1,
+   "total": 2
+  }
+ },
+ "off_token_classes": [
+  {
+   "class": "bg-nothing",
+   "reason": "unknown",
+   "file": "src/a.tsx",
+   "line": 2
+  }
+ ],
+ "prop_synonyms": [
+  {
+   "props": [
+    "scale",
+    "size"
+   ],
+   "values": [
+    "md",
+    "sm"
+   ],
+   "components": [
+    "A",
+    "B"
+   ]
+  }
+ ]
+}
