@@ -180,7 +180,7 @@ describe("browser integration", { skip: skipBrowser }, () => {
     const project = tmp("artist-proj-");
     const res = await run({ url: `${base}/clean.html`, project });
     assert.equal(res.error, undefined);
-    assert.equal(res.exitCode, 0);
+    assert.equal(res.exitCode, 0, res.error);
     const report = JSON.parse(fs.readFileSync(path.join(res.runDir, "report.json"), "utf8"));
     assert.equal(report.schema, 1);
     assert.equal(report.url, `${base}/clean.html`);
@@ -222,7 +222,7 @@ describe("browser integration", { skip: skipBrowser }, () => {
   test("axe-violation.html fails with serious or critical issues", async () => {
     const project = tmp("artist-proj-");
     const res = await run({ url: `${base}/axe-violation.html`, project });
-    assert.equal(res.exitCode, 1);
+    assert.equal(res.exitCode, 1, res.error);
     const report = JSON.parse(fs.readFileSync(path.join(res.runDir, "report.json"), "utf8"));
     assert.ok(report.axe.serious + report.axe.critical >= 1);
     assert.ok(report.axe.violations.length >= 1);
@@ -244,5 +244,35 @@ describe("cwvPasses", () => {
     assert.equal(cwvPasses({ lcp_ms: 900, cls: null, unstable: false }), false);
     assert.equal(cwvPasses({ lcp_ms: 900, cls: Number.NaN, unstable: false }), false);
     assert.equal(cwvPasses({ lcp_ms: 900, cls: 0.01, unstable: false }), true);
+  });
+});
+
+describe("screenshot", () => {
+  const transient = () => new Error("page.screenshot: Protocol error (Page.captureScreenshot): Unable to capture screenshot");
+  function fakePage(failures, error = transient) {
+    const page = { calls: 0, frames: 0 };
+    page.screenshot = async () => { page.calls++; if (page.calls <= failures) throw error(); };
+    page.evaluate = async () => { page.frames++; };
+    return page;
+  }
+
+  test("retries a transient capture failure after a frame", async () => {
+    const { screenshot } = await import("./verify.mjs");
+    const page = fakePage(1);
+    await screenshot(page, { path: "x.png" });
+    assert.equal(page.calls, 2);
+    assert.equal(page.frames, 1);
+  });
+
+  test("gives up after the retries are spent", async () => {
+    const { screenshot } = await import("./verify.mjs");
+    await assert.rejects(screenshot(fakePage(Infinity), { path: "x.png" }), /Unable to capture screenshot/);
+  });
+
+  test("does not retry other errors", async () => {
+    const { screenshot } = await import("./verify.mjs");
+    const page = fakePage(1, () => new Error("Target closed"));
+    await assert.rejects(screenshot(page, { path: "x.png" }), /Target closed/);
+    assert.equal(page.calls, 1);
   });
 });
