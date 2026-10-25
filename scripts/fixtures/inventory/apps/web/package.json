@@ -1,0 +1,5 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "dependencies": { "react": "18.3.1", "chart.js": "4.4.3", "lucide-react": "0.400.0", "zod": "3.23.0" }
+}
