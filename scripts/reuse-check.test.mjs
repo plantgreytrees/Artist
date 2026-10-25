@@ -697,3 +697,61 @@ test("--all: docs/design/** is never scanned for ratios and breakpoints are exem
   assert.equal(r.ratios.reduced_motion.total, 0);
   assert.deepEqual(r.raw_spacing, []);
 });
+
+// ---- scrutinise round 1: DESIGN.md read through design-md.mjs (ARCH-VERIFY-25) ----
+test("a fenced ## Spacing example is not a section; the real Spacing scale still applies", () => {
+  const md = withSection("```md\n## Spacing\n| name | value | use |\n|---|---|---|\n| space.x | 13px | example |\n```\n");
+  const r = checkReuse({ designMd: md, files: [{ path: "src/a.css", content: ".a{ padding: 13px; margin: 8px }" }] });
+  assert.deepEqual(
+    r.raw_spacing.map((x) => x.value),
+    ["13px"],
+  );
+});
+
+test("Spacing, Motion, Components and Layouts are read by header name, whatever the column order", () => {
+  const flip = (block) =>
+    block.replace(/^\| (.+?) \| (.+?) \| (.+?) \|$/gm, (line, a, b, c) => (/^-+$/.test(a) ? line : `| ${b} | ${a} | ${c} |`));
+  let md = designMd;
+  for (const title of ["Spacing", "Motion", "Components", "Layouts"]) {
+    md = md.replace(new RegExp(`(## ${title}\\n)([\\s\\S]*?)(\\n\\n)`), (_, h, body, tail) => h + flip(body) + tail);
+  }
+  assert.match(md, /## Spacing\n\| value \| name \| use \|/);
+  assert.match(md, /## Components\n\| path \| name \| use \|/);
+  const r = checkReuse({
+    designMd: md,
+    files: [
+      {
+        path: "src/a.css",
+        content:
+          ".a{ padding: 4px 8px; transition: opacity 150ms cubic-bezier(0.2, 0, 0, 1) } @media (prefers-reduced-motion: reduce){.a{transition:none}}",
+      },
+      { path: "src/components/Button.tsx", content: "export function Button() { return <b />; }\n" },
+      { path: "src/app/layout.tsx", content: "export default function L({ children }) { return children; }\n" },
+    ],
+  });
+  assert.deepEqual(r.raw_spacing, []);
+  assert.deepEqual(r.raw_motion, []);
+  assert.deepEqual(r.new_components, []);
+  assert.deepEqual(r.new_layouts, []);
+});
+
+test("--all: a Component tokens variable aliasing a colour token counts as a conforming colour reference", () => {
+  const md = withSection(
+    "## Component tokens\n| component | variable | semantic | use |\n|---|---|---|---|\n| Chip | --chip-bg | color.surface | bg |\n",
+  );
+  const r = all([{ path: "src/x.css", content: ".chip{ background: var(--chip-bg) }" }], md);
+  assert.deepEqual(r.ratios.colours, { conforming: 1, justified: 0, unjustified: 0, total: 1 });
+  const lit = withSection(
+    "## Component tokens\n| component | variable | semantic | use |\n|---|---|---|---|\n| Chip | --chip-bg | #ff00ff | bg |\n",
+  );
+  assert.equal(all([{ path: "src/x.css", content: ".chip{ background: var(--chip-bg) }" }], lit).ratios.colours.conforming, 0);
+});
+
+test("--all: a file-path justification does not justify component_tokens or component_api items", () => {
+  const files = [comp("A", btn("A", ["sm", "md"])), comp("B", btn("B", ["lg", "xl"]))];
+  const r = all(files, designMd, { "src/components/A.tsx": "reduced motion handled elsewhere" });
+  assert.equal(r.ratios.component_api.justified, 0);
+  assert.equal(r.ratios.component_api.unjustified, 1);
+  assert.equal(r.ratios.component_tokens.justified, 0);
+  sumOk(r);
+});

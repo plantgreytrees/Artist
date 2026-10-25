@@ -173,6 +173,21 @@ export function bindTokens(md) {
   return out;
 }
 
+// Platform notes `token files` / `theme files` entries, in order, deduplicated. Accepts
+// `- **token files**: \`a.css\`, ./b.css`; a trailing `/` names a directory. Paths only, no I/O.
+export function tokenFilesOf(md) {
+  const out = [];
+  for (const line of String(md ?? "").split(/\r?\n/)) {
+    const m = /^\s*[-*]?\s*(?:\*\*)?(?:token|theme)[^:\n]*files?[^:\n]*:\s*(.+)$/i.exec(line);
+    if (!m) continue;
+    for (const f of m[1].split(",")) {
+      const t = f.replace(/[`*]/g, "").trim().replace(/^\.\//, "");
+      if (t && !out.includes(t)) out.push(t);
+    }
+  }
+  return out;
+}
+
 // Tailwind v4 `--spacing` base in px, read from token-file text (default 0.25rem, 1rem = 16px).
 export function spacingBaseOf(texts) {
   for (const text of Array.isArray(texts) ? texts : [texts]) {

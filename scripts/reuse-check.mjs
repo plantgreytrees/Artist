@@ -5,32 +5,8 @@ import { join, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { buildInventory, capOf, formatOf, listProjectFiles } from "./inventory.mjs";
-import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf } from "./design-md.mjs";
-import { resolveClass } from "./token-refs.mjs";
-
-function sections(md) {
-  const out = {};
-  let cur = null;
-  for (const line of md.split(/\r?\n/)) {
-    const h = /^##\s+(.+?)\s*$/.exec(line);
-    if (h) {
-      cur = h[1];
-      out[cur] = [];
-      continue;
-    }
-    if (cur && line.trim().startsWith("|")) {
-      const cells = line
-        .trim()
-        .replace(/^\||\|$/g, "")
-        .split("|")
-        .map((s) => s.trim());
-      if (cells.every((c) => /^:?-+:?$/.test(c))) continue;
-      out[cur].push(cells);
-    }
-  }
-  for (const k of Object.keys(out)) out[k] = out[k].slice(1); // drop header row
-  return out;
-}
+import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf, tableOf, tokenFilesOf } from "./design-md.mjs";
+import { resolveClass, tokenRefsIn, STRING_LIT } from "./token-refs.mjs";
 
 const hexOf = (n) =>
   Math.max(0, Math.min(255, Number(n)))
@@ -79,19 +55,7 @@ const toMs = (n, unit) => Math.round((unit === "s" ? num(n) * 1000 : num(n)) * 1
 const toPx = (n, unit) => (unit === "rem" ? num(n) * 16 : num(n));
 const normBezier = (s) => s.toLowerCase().replace(/[\s_]+/g, "");
 
-function tokenFiles(md) {
-  const out = new Set();
-  for (const line of md.split(/\r?\n/)) {
-    const m = /^\s*[-*]?\s*(?:token|theme)[^:\n]*files?[^:\n]*:\s*(.+)$/i.exec(line);
-    if (m)
-      for (const f of m[1].split(",")) {
-        const t = f.replace(/[`*]/g, "").trim().replace(/^\.\//, "");
-        if (t) out.add(t);
-      }
-  }
-  return out;
-}
-const isTokenFile = (set, p) => [...set].some((t) => (t.endsWith("/") ? p.startsWith(t) : p === t));
+const isTokenFile = (list, p) => list.some((t) => (t.endsWith("/") ? p.startsWith(t) : p === t));
 
 const SPACING_PROP = String.raw`(?:padding|margin|gap|row-gap|column-gap|rowGap|columnGap)(?:-?(?:Top|Right|Bottom|Left|top|right|bottom|left|block|inline)(?:-?(?:start|end|Start|End))?)?`;
 const CSS_SPACING = new RegExp(String.raw`(?<![\w-])${SPACING_PROP}\s*:\s*([^;}\n]*)`, "g");
@@ -150,17 +114,17 @@ function scanMotion(text, mo) {
   return hits;
 }
 
-function scales(sec) {
+// Spacing and Motion scales from each row's `value` cell (tables read by header, ARCH-VERIFY-25).
+function scales(md) {
   const spacing = new Set();
-  for (const r of sec.Spacing || [])
-    for (const c of r.slice(1)) for (const l of c.matchAll(LEN)) spacing.add(toPx(l[1], l[2]));
+  for (const r of tableOf(md, "Spacing")) for (const l of (r.value ?? "").matchAll(LEN)) spacing.add(toPx(l[1], l[2]));
   const durations = new Set(),
     easings = new Set();
-  for (const r of sec.Motion || [])
-    for (const c of r.slice(1)) {
-      for (const d of c.matchAll(DUR)) durations.add(toMs(d[1], d[2]));
-      for (const b of c.matchAll(BEZIER)) easings.add(normBezier(b[0]));
-    }
+  for (const r of tableOf(md, "Motion")) {
+    const v = r.value ?? "";
+    for (const d of v.matchAll(DUR)) durations.add(toMs(d[1], d[2]));
+    for (const b of v.matchAll(BEZIER)) easings.add(normBezier(b[0]));
+  }
   return { spacing, motion: { durations, easings } };
 }
 
@@ -169,29 +133,7 @@ const propSet = (c) => new Set((c.props || []).map((p) => p.name));
 const SCAN_EXT = /\.(js|jsx|ts|tsx|mjs|cjs|css|scss|sass|less|vue|svelte|html)$/i;
 const isDesignDoc = (p) => /(^|\/)docs\/design\//.test(p);
 
-const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
-const STRING_LIT = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-
-// Bound variables a file references: CSS var(), Tailwind v4 utilities, RN member chains.
-function varRefs(content, ctx) {
-  const out = new Set();
-  for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
-  if (!ctx.tokens.length) return out;
-  for (const m of content.matchAll(STRING_LIT)) {
-    for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
-      if (!cls || cls.length > 120) continue;
-      const r = resolveClass(cls, ctx);
-      if (r.kind === "token") for (const v of r.variables) out.add(v);
-    }
-  }
-  for (const m of content.matchAll(RN_ROOT)) {
-    const segs = m[0].split(".");
-    const cands = new Set(segs.map((_, i) => segs.slice(i).join(".")));
-    for (const t of ctx.tokens) if (t.kind === "semantic" && cands.has(t.name)) out.add(t.variable);
-  }
-  return out;
-}
 
 const ratio = (conforming, items) => {
   const justified = items.filter((x) => x.justified).length;
@@ -203,13 +145,13 @@ const ROUTE_FILES = /^(page|layout|template|loading|error|not-found|route|defaul
 
 export function checkReuse({ designMd, files, justifications = {}, all = false, inventory = null }) {
   if (formatOf(designMd) !== 2) throw new Error("DESIGN.md is not format 2; rerun design-system init");
-  const sec = sections(designMd);
-  const tokFiles = tokenFiles(designMd);
-  const scale = scales(sec);
-  const compNames = new Set((sec.Components || []).map((r) => r[0]));
-  const compPaths = new Set((sec.Components || []).map((r) => r[1]));
-  const layoutPaths = new Set((sec.Layouts || []).map((r) => r[1]));
-  const pkgs = new Map((sec.Packages || []).map((r) => [r[0], r[2] || ""]));
+  const tokFiles = tokenFilesOf(designMd);
+  const scale = scales(designMd);
+  const components = tableOf(designMd, "Components");
+  const compNames = new Set(components.map((r) => r.name));
+  const compPaths = new Set(components.map((r) => r.path));
+  const layoutPaths = new Set(tableOf(designMd, "Layouts").map((r) => r.path));
+  const pkgs = new Map(tableOf(designMd, "Packages").map((r) => [r.package ?? r.name, r.capability || ""]));
 
   const res = {
     schema: 3,
@@ -232,6 +174,13 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     : [];
   const tctx = { tokens: all ? bindTokens(designMd) : [], spacingPx: spacingBaseOf(tokenTexts) };
   const varCat = new Map(tctx.tokens.map((t) => [t.variable, t.category]));
+  // A Component tokens variable aliasing a token counts in that token's category (ARCH-PLUGIN-35).
+  const catByName = new Map(tctx.tokens.map((t) => [t.name, t.category]));
+  for (const r of all ? componentTokensOf(designMd) : []) {
+    const v = (r.variable ?? "").trim();
+    const cat = catByName.get((r.semantic ?? "").trim());
+    if (v && cat && !varCat.has(v)) varCat.set(v, cat);
+  }
   const conforming = { colours: new Set(), spacing: new Set(), motion: new Set() };
   const offClasses = [];
   const offSeen = new Set();
@@ -302,7 +251,7 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
       res.missing_reduced_motion.push(justify({ name: p, file: p, line: lineOf(f.content, idx) }, justifications));
     } else if (ANIMATED.some((re) => re.test(f.content))) animatedConforming++;
     if (all) {
-      for (const v of varRefs(f.content, tctx)) {
+      for (const v of tokenRefsIn(f.content, tctx)) {
         const cat = varCat.get(v);
         if (conforming[cat]) conforming[cat].add(p + "\0" + v);
       }
@@ -393,7 +342,8 @@ function ratiosOf(res, { cur, designMd, justifications, conforming, animatedConf
     const lits = litBy(c.name);
     if (rows.length && !lits.length) ct.conforming++;
     else {
-      const item = justify({ name: c.name, file: c.path, line: 1 }, justifications);
+      // keyed by name only: a file-path justification is for missing_reduced_motion (ARCH-VERIFY-22)
+      const item = { ...justify({ name: c.name }, justifications), file: c.path, line: 1 };
       if (!item.justified && lits.length && lits.every((l) => l.justified)) item.justified = true;
       ct.items.push(item);
     }
@@ -422,18 +372,13 @@ function ratiosOf(res, { cur, designMd, justifications, conforming, animatedConf
     for (const e of list) {
       if (e.joined === best) api.conforming++;
       else
-        api.items.push(
-          justify(
-            {
-              name: `${e.c.name}.${prop}`,
-              file: e.c.path,
-              line: 1,
-              values: e.joined.split(","),
-              expected: best.split(","),
-            },
-            justifications,
-          ),
-        );
+        api.items.push({
+          ...justify({ name: `${e.c.name}.${prop}` }, justifications),
+          file: e.c.path,
+          line: 1,
+          values: e.joined.split(","),
+          expected: best.split(","),
+        });
     }
   }
   const mkRatio = (cat, raw) => ratio(conforming[cat].size, raw);

@@ -102,6 +102,32 @@ export function resolveClass(cls, ctx = {}) {
   );
 }
 
+export const STRING_LIT = /"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g;
+const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
+
+// Bound variables a source file references (ARCH-VERIFY-23): CSS var(), Tailwind v4 utilities
+// resolved to tokens, and React Native member chains ending in a Semantic token name.
+export function tokenRefsIn(content, ctx = {}) {
+  const out = new Set();
+  for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
+  const tokens = ctx.tokens ?? [];
+  if (!tokens.length) return out;
+  for (const m of content.matchAll(STRING_LIT)) {
+    for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
+      if (!cls || cls.length > 120) continue;
+      const r = resolveClass(cls, ctx);
+      if (r.kind === "token") for (const v of r.variables) out.add(v);
+    }
+  }
+  const semantic = tokens.filter((t) => t.kind === "semantic");
+  for (const m of content.matchAll(RN_ROOT)) {
+    const segs = m[0].split(".");
+    const cands = new Set(segs.map((_, i) => segs.slice(i).join(".")));
+    for (const t of semantic) if (cands.has(t.name)) out.add(t.variable);
+  }
+  return out;
+}
+
 // Classes matching no DESIGN.md token or more than one, as unique { class, reason }.
 export function offTokenClasses(classes, ctx = {}) {
   const seen = new Set();

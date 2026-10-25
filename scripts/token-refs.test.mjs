@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { bindTokens, spacingBaseOf } from "./design-md.mjs";
-import { parseClass, resolveClass, offTokenClasses } from "./token-refs.mjs";
+import { parseClass, resolveClass, offTokenClasses, tokenRefsIn } from "./token-refs.mjs";
 
 const MD =
   "## Semantic tokens\n| variable | name | primitive | use |\n|---|---|---|---|\n" +
@@ -68,4 +68,12 @@ test("p-4 resolves against the default 0.25rem base and a custom --spacing: 4px"
 test("token-refs.mjs is pure: no node:fs or child_process", () => {
   const src = readFileSync(fileURLToPath(new URL("./token-refs.mjs", import.meta.url)), "utf8");
   assert.doesNotMatch(src, /node:fs|child_process/);
+});
+
+test("tokenRefsIn collects var(), Tailwind utilities and exact RN semantic chains", () => {
+  const md = "---\nformat: 2\n---\n## Semantic tokens\n| name | variable | primitive | use |\n|---|---|---|---|\n| color.brand | --color-brand | x | y |\n\n## Primitives\n| name | value |\n|---|---|\n| x | #123456 |\n";
+  const ctx = { tokens: bindTokens(md), spacingPx: 4 };
+  const refs = tokenRefsIn('a{color:var(--other)} const c = "bg-brand"; const t = theme.color.brand;', ctx);
+  assert.deepEqual([...refs].sort(), ["--color-brand", "--other"]);
+  assert.deepEqual([...tokenRefsIn("var(--x) theme.color.brand", { tokens: [], spacingPx: 4 })], ["--x"]);
 });
