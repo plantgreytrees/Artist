@@ -266,7 +266,7 @@ test("--check rejects untrusted manifest roles and paths before reading", () => 
     tamper(dir, fn);
     const r = run(dir, "--check");
     assert.equal(r.status, 2, `case ${i}: ${r.stderr}`);
-    assert.match(r.stderr, /manifest/, `case ${i}`);
+    assert.match(r.stderr, /manifest|input /, `case ${i}`);
   }
 });
 
@@ -309,4 +309,32 @@ test("hostile inventory.json and reuse.json keys and values are escaped", () => 
   assert.doesNotMatch(h, /<script/i);
   assert.doesNotMatch(h, /<img/i);
   assert.ok(h.includes("&lt;script&gt;"));
+});
+
+// ---- scrutinise round 2 ----------------------------------------------------
+test("an in-project symlinked DESIGN.md renders and --check is fresh", () => {
+  const dir = project("clean");
+  cpSync(join(dir, "DESIGN.md"), join(dir, "real.md"));
+  rmSync(join(dir, "DESIGN.md"));
+  symlinkSync("real.md", join(dir, "DESIGN.md"));
+  const r = run(dir);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(run(dir, "--check").status, 0);
+  assert.doesNotMatch(run(join(dir, "nowhere")).stderr, /manifest/);
+});
+
+test("design-doc never writes through a symlink that leaves the project", () => {
+  const outside = mkdtempSync(join(tmpdir(), "dd-target-"));
+  const d1 = project("clean");
+  rmSync(join(d1, "docs", "design"), { recursive: true });
+  symlinkSync(outside, join(d1, "docs", "design"));
+  assert.equal(run(d1).status, 2);
+  assert.equal(existsSync(join(outside, "design-system.html")), false);
+
+  const d2 = project("clean");
+  const victim = join(outside, "victim.txt");
+  writeFileSync(victim, "keep");
+  symlinkSync(victim, join(d2, ...OUT));
+  assert.equal(run(d2).status, 2);
+  assert.equal(readFileSync(victim, "utf8"), "keep");
 });

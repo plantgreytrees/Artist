@@ -5,7 +5,7 @@
 // Imports design-md only; never the reuse audit module (ARCH-VERIFY-25).
 
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { formatOf, tokensOf, componentTokensOf, decisionsOf } from "./design-md.mjs";
 
@@ -235,13 +235,22 @@ function validateSpecs(project, specs) {
   if (!seen.has("design")) throw new UserError("manifest has no design input");
 }
 
+// lstat never follows a symlink, so a symlinked output reads as "not a regular file".
+const lstatOrNull = (p) => {
+  try {
+    return lstatSync(p);
+  } catch {
+    return null;
+  }
+};
+const within = (project, real) => real.startsWith(realpathSync(project) + sep);
+
 function readEntry(project, role, path) {
   const abs = resolve(project, path);
   if (!existsSync(abs)) return null;
-  if (!lstatSync(abs).isFile()) throw new UserError(`manifest input is not a regular file: ${path}`);
-  const real = realpathSync(abs);
-  const root = realpathSync(project);
-  if (!real.startsWith(root + sep)) throw new UserError(`manifest input resolves outside the project: ${path}`);
+  // stat follows a symlink; the realpath check below keeps it inside the project.
+  if (!statSync(abs).isFile()) throw new UserError(`input is not a regular file: ${path}`);
+  if (!within(project, realpathSync(abs))) throw new UserError(`input resolves outside the project: ${path}`);
   const buf = readFileSync(abs);
   return { entry: { role, path, sha256: sha256(buf) }, text: buf.toString("utf8") };
 }
@@ -316,7 +325,12 @@ export function main(argv) {
 
   const specs = gather(project, reuse);
   const { html } = build(project, specs, { missingIsStale: false });
+  // Write only docs/design/design-system.html inside the project (ARCH-VERIFY-24): never
+  // through a symlinked directory that leaves it, never through a symlinked output file.
   mkdirSync(dirname(out), { recursive: true });
+  if (!within(project, realpathSync(dirname(out)))) throw new UserError(`${dirname(OUT_REL)} resolves outside the project`);
+  const existing = lstatOrNull(out);
+  if (existing && !existing.isFile()) throw new UserError(`${OUT_REL} is not a regular file`);
   writeFileSync(out, html);
   return 0;
 }
