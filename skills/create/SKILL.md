@@ -29,6 +29,7 @@ Check the DESIGN.md inventory (Components with props and variants, Layouts, Sche
 
 - Reuse any component, layout, schema or semantic token that fits.
 - Colours, spacing and motion only through semantic tokens (CSS variables or theme keys), never literals, outside the token files listed in Platform notes.
+- Variables first: a component that needs its own knobs reads Component tokens (`--button-padding-x`, `theme.component.button.paddingX`) that alias semantic tokens, never literals. In Tailwind v4 use token or variable-backed utilities (`bg-action-primary`, `p-(--button-padding-x)`). Breakpoints are the only literal tier.
 - Every animation uses the Motion tokens and has a reduced-motion fallback (`prefers-reduced-motion`, `motion-safe:`/`motion-reduce:`, or `useReducedMotion`).
 - If an installed package covers the need (chart.js for a chart, the installed icon set for icons, the installed animation or date library), use it. Do not hand-roll it and do not add another library for the same capability.
 - Anything new the check flags needs a one-line reason in that round's `<runDir>/justifications.json`, with the reason as the value. Key each entry by what reuse-check reports: the component, layout or package name; the colour, spacing or motion value exactly as reported (for example `#7b5cff`, `13px`, `420ms`, `cubic-bezier(...)`); or the file path for a `missing_reduced_motion` item. A reason is enough; the user's explicit request for something new counts as one.

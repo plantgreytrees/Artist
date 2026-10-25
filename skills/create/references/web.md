@@ -12,6 +12,8 @@ Load this for web stacks. Reuse first: check the DESIGN.md Components, Layouts a
 - Tailwind v4 CSS-first only. Declare each DESIGN.md semantic token as a CSS variable in an `@theme` block of the token file (`--color-action-primary`); keep semantic tokens in `@theme static` so aliased variables are always emitted, and use `@theme inline` for values that reference other variables. A JS config is unsupported and not parsed.
 - Use token classes (`bg-action-primary`) or the variable shorthand `bg-(--color-action-primary)`, not raw hex values or arbitrary `[...]` values.
 - Switch brands and light/dark by attribute sets that redefine the variables, for example `[data-theme="dark"]` and `[data-brand="acme"]` blocks in the token file. Components never change; only the variable values do.
+- Component tokens: a variant-bearing or brand-overridden component declares its knobs on its root as variables that alias semantic tokens (`--button-padding-x: var(--space-4)`) and reads them with `px-(--button-padding-x)`. Record them in DESIGN.md's Component tokens table; never give one a literal value. Simple components use semantic tokens directly.
+- Breakpoints are the only literal tier.
 - A needed one-off value is proposed as a token, not hard-coded.
 - Use responsive prefixes for the verified widths (375, 768, 1280); design mobile-first.
 - Use `motion-safe:` / `motion-reduce:` variants (or `@media (prefers-reduced-motion: reduce)`) for every animation, with durations and easings from the Motion tokens.
