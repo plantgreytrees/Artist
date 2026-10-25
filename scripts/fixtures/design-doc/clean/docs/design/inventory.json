@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "components": [{ "name": "Button", "path": "src/Button.tsx", "props": ["variant", "size"] }],
+  "layouts": [],
+  "schemas": [],
+  "packages": [{ "name": "react", "version": "19.0.0" }],
+  "unparsed": []
+}
