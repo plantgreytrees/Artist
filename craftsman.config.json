@@ -1,7 +1,7 @@
 {
   "stopGate": {
     "commands": {
-      "package.json": "npm test --silent"
+      "package.json": "node --test scripts/*.test.mjs"
     }
   }
 }
