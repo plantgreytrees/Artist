@@ -18,8 +18,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatOf, bindTokens, decisionsOf, spacingBaseOf } from "./design-md.mjs";
-import { resolveClass } from "./token-refs.mjs";
+import { formatOf, bindTokens, decisionsOf, spacingBaseOf, tokenFilesOf } from "./design-md.mjs";
+import { tokenRefsIn } from "./token-refs.mjs";
 
 export const START = "<!-- artist:inventory:start -->";
 export const END = "<!-- artist:inventory:end -->";
@@ -140,30 +140,8 @@ function tokenCtx(designMd, tokenTexts) {
   return { tokens: bindTokens(designMd || ""), spacingPx: spacingBaseOf(tokenTexts ?? []) };
 }
 
-const RN_ROOT = /(?<![\w$.])(?:theme|tokens|colors)(?:\.[A-Za-z_$][\w$]*)+/g;
-
-// Bound variables a source file references: CSS var(), Tailwind v4 utilities, RN member chains.
-function tokensIn(content, ctx) {
-  const out = new Set();
-  for (const m of content.matchAll(/var\(\s*(--[\w-]+)/g)) out.add(m[1]);
-  if (ctx.tokens.length) {
-    for (const m of content.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
-      for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
-        if (!cls || cls.length > 120) continue;
-        const r = resolveClass(cls, ctx);
-        if (r.kind === "token") for (const v of r.variables) out.add(v);
-      }
-    }
-    const semantic = ctx.tokens.filter((t) => t.kind === "semantic");
-    for (const m of content.matchAll(RN_ROOT)) {
-      const segs = m[0].split(".");
-      const cands = new Set();
-      for (let i = 0; i < segs.length; i++) cands.add(segs.slice(i).join("."));
-      for (const t of semantic) if (cands.has(t.name)) out.add(t.variable);
-    }
-  }
-  return uniqSorted([...out]);
-}
+// Bound variables a source file references (shared with reuse-check via token-refs).
+const tokensIn = (content, ctx) => uniqSorted([...tokenRefsIn(content, ctx)]);
 
 // ---- Vue single-file components ----
 
@@ -734,12 +712,8 @@ export function replaceMarked(md, section) {
 
 // Declared `token files` (Platform notes) read as text, never executed; paths stay inside the project.
 function tokenFileTexts(project, md) {
-  const line = /token files\s*:\s*(.+)/i.exec(md);
-  if (!line) return [];
   const texts = [];
-  for (const raw of line[1].split(",")) {
-    const rel = raw.trim().replace(/^`|`$/g, "");
-    if (!rel) continue;
+  for (const rel of tokenFilesOf(md)) {
     const abs = join(project, rel);
     const back = relative(project, abs);
     if (back.startsWith("..") || !existsSync(abs) || !isRegular(abs)) continue;

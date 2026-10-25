@@ -14,6 +14,7 @@ import {
   bindTokens,
   categoryOf,
   spacingBaseOf,
+  tokenFilesOf,
 } from "./design-md.mjs";
 
 const fixture = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
@@ -148,4 +149,14 @@ test("spacingBaseOf reads --spacing statically, defaulting to 0.25rem (4px)", ()
   assert.equal(spacingBaseOf(["@theme { --spacing: 8px; }"]), 8);
   assert.equal(spacingBaseOf(["@theme { --spacing: 0.5rem; }"]), 8);
   assert.equal(spacingBaseOf([]), 4);
+});
+
+test("tokenFilesOf reads every Platform notes spelling of the token files line", () => {
+  assert.deepEqual(tokenFilesOf("- token files: src/styles/tokens.css, ./src/theme.css\n"), [
+    "src/styles/tokens.css",
+    "src/theme.css",
+  ]);
+  assert.deepEqual(tokenFilesOf("- **token files**: `src/a.css`\n- theme files: src/themes/\n"), ["src/a.css", "src/themes/"]);
+  assert.deepEqual(tokenFilesOf("- Token file: a.css, a.css\n"), ["a.css"]);
+  assert.deepEqual(tokenFilesOf("no such line\n"), []);
 });
