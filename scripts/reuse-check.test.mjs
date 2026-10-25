@@ -755,3 +755,24 @@ test("--all: a file-path justification does not justify component_tokens or comp
   assert.equal(r.ratios.component_tokens.justified, 0);
   sumOk(r);
 });
+
+test("a capitalised Spacing table is read by header name", () => {
+  const md = designMd.replace("## Spacing\n| name | value | use |", "## Spacing\n| Name | Value | Use |");
+  assert.match(md, /\| Name \| Value \| Use \|/);
+  const r = checkReuse({ designMd: md, files: [{ path: "src/a.css", content: ".a{ padding: 4px 8px }" }] });
+  assert.deepEqual(r.raw_spacing, []);
+});
+
+test("CLI resolves a relative --run against --project, whatever the cwd", () => {
+  const p = mkdtempSync(join(tmpdir(), "reuse-proj-"));
+  spawnSync("cp", ["-r", fx + "/.", p]);
+  const elsewhere = mkdtempSync(join(tmpdir(), "reuse-cwd-"));
+  const res = spawnSync(
+    process.execPath,
+    [join(here, "reuse-check.mjs"), "--project", p, "--run", ".artist/audit", "--files", "src/components/Button.tsx"],
+    { encoding: "utf8", cwd: elsewhere },
+  );
+  assert.ok(res.status === 0 || res.status === 1, res.stderr);
+  assert.ok(existsSync(join(p, ".artist/audit/reuse.json")));
+  assert.equal(existsSync(join(elsewhere, ".artist")), false);
+});

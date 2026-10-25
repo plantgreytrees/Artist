@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -543,4 +543,22 @@ test("JSDoc @deprecated still deprecates", () => {
 
 test("inventory.mjs never dynamically imports or requires", () => {
   assert.doesNotMatch(readFileSync(CLI, "utf8"), /\brequire\s*\(|\bimport\s*\(/);
+});
+
+test("a token files directory entry is read like reuse-check reads it (custom --spacing)", () => {
+  const tokensUsedWith = (entry) => {
+    const dir = copy();
+    mkdirSync(join(dir, "tailwind-v4/themes"), { recursive: true });
+    writeFileSync(join(dir, "tailwind-v4/themes/theme.css"), twCss.replace("--spacing: 0.25rem", "--spacing: 8px"));
+    rmSync(join(dir, "tailwind-v4/theme.css"));
+    const md = readFileSync(join(TW, "DESIGN.md"), "utf8").replace("- token files: tailwind-v4/theme.css", `- token files: ${entry}`);
+    writeFileSync(join(dir, "DESIGN.md"), md + "\n<!-- artist:inventory:start -->\n<!-- artist:inventory:end -->\n");
+    const r = run(dir);
+    assert.equal(r.status, 0, r.stderr);
+    const inv = JSON.parse(readFileSync(join(dir, "docs/design/inventory.json"), "utf8"));
+    return inv.components.find((c) => c.path === "tailwind-v4/src/Button.tsx").tokensUsed;
+  };
+  const viaDir = tokensUsedWith("tailwind-v4/themes/");
+  assert.deepEqual(viaDir, tokensUsedWith("tailwind-v4/themes/theme.css"));
+  assert.equal(viaDir.includes("--space-4"), false); // 8px base: px-4 = 32px, not space.4
 });

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Deterministic reuse check: DESIGN.md + changed files + justifications -> reuse.json
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { buildInventory, capOf, formatOf, listProjectFiles } from "./inventory.mjs";
-import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf, tableOf, tokenFilesOf } from "./design-md.mjs";
-import { resolveClass, tokenRefsIn, STRING_LIT } from "./token-refs.mjs";
+import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf, tableOf, tokenFilesOf, isTokenFile } from "./design-md.mjs";
+import { resolveClass, tokenRefsIn, classesIn } from "./token-refs.mjs";
 
 const hexOf = (n) =>
   Math.max(0, Math.min(255, Number(n)))
@@ -55,7 +55,6 @@ const toMs = (n, unit) => Math.round((unit === "s" ? num(n) * 1000 : num(n)) * 1
 const toPx = (n, unit) => (unit === "rem" ? num(n) * 16 : num(n));
 const normBezier = (s) => s.toLowerCase().replace(/[\s_]+/g, "");
 
-const isTokenFile = (list, p) => list.some((t) => (t.endsWith("/") ? p.startsWith(t) : p === t));
 
 const SPACING_PROP = String.raw`(?:padding|margin|gap|row-gap|column-gap|rowGap|columnGap)(?:-?(?:Top|Right|Bottom|Left|top|right|bottom|left|block|inline)(?:-?(?:start|end|Start|End))?)?`;
 const CSS_SPACING = new RegExp(String.raw`(?<![\w-])${SPACING_PROP}\s*:\s*([^;}\n]*)`, "g");
@@ -256,14 +255,12 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
         if (conforming[cat]) conforming[cat].add(p + "\0" + v);
       }
       if (tctx.tokens.length)
-        for (const m of f.content.matchAll(STRING_LIT)) {
-          for (const cls of (m[1] ?? m[2] ?? m[3]).split(/\s+/)) {
-            if (!cls || cls.length > 120 || offSeen.has(cls)) continue;
-            const r = resolveClass(cls, tctx);
-            if (r.kind !== "unknown" && r.kind !== "ambiguous") continue;
-            offSeen.add(cls);
-            offClasses.push({ class: cls, reason: r.kind, file: p, line: lineOf(f.content, m.index) });
-          }
+        for (const { cls, index } of classesIn(f.content)) {
+          if (offSeen.has(cls)) continue;
+          const r = resolveClass(cls, tctx);
+          if (r.kind !== "unknown" && r.kind !== "ambiguous") continue;
+          offSeen.add(cls);
+          offClasses.push({ class: cls, reason: r.kind, file: p, line: lineOf(f.content, index) });
         }
     }
   }
@@ -471,8 +468,10 @@ function main() {
     }
   }
   const result = checkReuse({ designMd, files, justifications, all: !!a.all, inventory });
-  mkdirSync(a.run, { recursive: true });
-  writeFileSync(join(a.run, "reuse.json"), JSON.stringify(result, null, 2) + "\n");
+  // A relative --run is relative to --project, as design-doc's --reuse is (ARCH-PLUGIN-36).
+  const runDir = resolve(a.project, a.run);
+  mkdirSync(runDir, { recursive: true });
+  writeFileSync(join(runDir, "reuse.json"), JSON.stringify(result, null, 2) + "\n");
   return result.unjustified ? 1 : 0;
 }
 

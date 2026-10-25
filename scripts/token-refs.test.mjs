@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { bindTokens, spacingBaseOf } from "./design-md.mjs";
-import { parseClass, resolveClass, offTokenClasses, tokenRefsIn } from "./token-refs.mjs";
+import { parseClass, resolveClass, offTokenClasses, tokenRefsIn, classesIn } from "./token-refs.mjs";
 
 const MD =
   "## Semantic tokens\n| variable | name | primitive | use |\n|---|---|---|---|\n" +
@@ -76,4 +76,16 @@ test("tokenRefsIn collects var(), Tailwind utilities and exact RN semantic chain
   const refs = tokenRefsIn('a{color:var(--other)} const c = "bg-brand"; const t = theme.color.brand;', ctx);
   assert.deepEqual([...refs].sort(), ["--color-brand", "--other"]);
   assert.deepEqual([...tokenRefsIn("var(--x) theme.color.brand", { tokens: [], spacingPx: 4 })], ["--x"]);
+});
+
+test("classesIn yields each class in string literals with its index; token-refs exports no RegExp", async () => {
+  const got = [...classesIn('a = "bg-brand  p-2"; b = \'x\'')].map((c) => [c.cls, c.index]);
+  assert.deepEqual(got, [
+    ["bg-brand", 4],
+    ["p-2", 4],
+    ["x", 25],
+  ]);
+  assert.deepEqual([...classesIn(`"${"a".repeat(121)}"`)], []);
+  const mod = await import("./token-refs.mjs");
+  assert.equal(Object.values(mod).some((v) => v instanceof RegExp), false);
 });
