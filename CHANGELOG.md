@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- Design depth and white-label theming: format-2 `DESIGN.md` with a generated component, layout, schema and package inventory, semantic tokens and per-brand light/dark themes; a platform consistency audit (`docs/design/consistency.md`); and motion enforcement (motion tokens and reduced-motion fallbacks) in `create` and `optimise`.
+- Design depth and white-label theming: format-2 `DESIGN.md` with a generated component, layout, schema and package inventory, semantic tokens and per-brand light/dark themes; a platform consistency audit (`docs/design/consistency.md`); motion enforcement (motion tokens and reduced-motion fallbacks) in `create` and `optimise`; a variables-first tier (optional `## Component tokens` aliasing semantic tokens, Tailwind v4 CSS-first only); an append-only `## Decisions` table; a deterministic, script-free `docs/design/design-system.html` from `scripts/design-doc.mjs`; and per-category uniformity ratios `{conforming, justified, unjustified, total}` in `reuse.json` schema 3 with no total score. Rollback: revert the merges; Component tokens and Decisions are optional sections, and the schema-3 ratio keys appear only with `reuse-check.mjs --all`.
 - Vue and Nuxt support in `inventory.mjs` and `reuse-check.mjs --all`: `.vue` components with their props, variants, tokens, usage and deprecation; Nuxt auto-import names, layouts and their page routes; and capability tags for Vue packages (Pinia, Nuxt UI, Vuetify, PrimeVue, vue-echarts, VeeValidate and others).
 
 ## [0.1.0] - 2026-10-25
