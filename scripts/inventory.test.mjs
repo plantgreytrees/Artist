@@ -173,17 +173,17 @@ test("CAPS, capOf and formatOf are exported from inventory.mjs and defined once"
 test("listProjectFiles honours .gitignore in a repo and walks outside git", async () => {
   const { listProjectFiles } = await import("./inventory.mjs");
   const d = mkdtempSync(join(tmpdir(), "lpf-"));
-  mkdirSync(join(d, "dist"));
+  mkdirSync(join(d, "gen"));
   mkdirSync(join(d, "src"));
   mkdirSync(join(d, "node_modules/x"), { recursive: true });
-  writeFileSync(join(d, "dist/a.tsx"), "x");
+  writeFileSync(join(d, "gen/a.tsx"), "x");
   writeFileSync(join(d, "src/b.tsx"), "x");
   writeFileSync(join(d, "src/gone.tsx"), "x");
   writeFileSync(join(d, "node_modules/x/c.js"), "x");
-  assert.deepEqual(listProjectFiles(d), ["dist/a.tsx", "src/b.tsx", "src/gone.tsx"]);
+  assert.deepEqual(listProjectFiles(d), ["gen/a.tsx", "src/b.tsx", "src/gone.tsx"]);
   const g = (...a) => spawnSync("git", ["-C", d, ...a], { encoding: "utf8" });
   g("init", "-q");
-  writeFileSync(join(d, ".gitignore"), "dist/\n");
+  writeFileSync(join(d, ".gitignore"), "gen/\n");
   g("add", "-A");
   g("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c");
   (await import("node:fs")).rmSync(join(d, "src/gone.tsx"));
@@ -201,4 +201,41 @@ test("an ignored project directory inside a parent repo is still listed", async 
   mkdirSync(join(root, "app/src/components"), { recursive: true });
   writeFileSync(join(root, "app/src/components/X.tsx"), "export function X() { return null; }\n");
   assert.deepEqual(listProjectFiles(join(root, "app")), ["src/components/X.tsx"]);
+});
+
+const ignoredApp = (parentIgnore) => {
+  const root = mkdtempSync(join(tmpdir(), "inv-ignored-"));
+  const git = (...a) => spawnSync("git", ["-C", root, ...a], { encoding: "utf8" });
+  git("init", "-q");
+  writeFileSync(join(root, ".gitignore"), parentIgnore);
+  git("add", ".gitignore");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+  mkdirSync(join(root, "app/src"), { recursive: true });
+  writeFileSync(join(root, "app/src/a.tsx"), "export const a = 1;\n");
+  return join(root, "app");
+};
+
+test("an ignored project directory still honours its own .gitignore", async () => {
+  const { listProjectFiles } = await import("./inventory.mjs");
+  const app = ignoredApp("app/\n");
+  writeFileSync(join(app, ".gitignore"), "generated/\n");
+  mkdirSync(join(app, "generated"), { recursive: true });
+  writeFileSync(join(app, "generated/bundle.js"), "x\n");
+  mkdirSync(join(app, "dist"), { recursive: true });
+  writeFileSync(join(app, "dist/out.js"), "x\n");
+  assert.deepEqual(listProjectFiles(app), [".gitignore", "src/a.tsx"]);
+});
+
+test("a parent pattern that ignores only the contents still lists the project", async () => {
+  const { listProjectFiles } = await import("./inventory.mjs");
+  const app = ignoredApp("/app/**\n");
+  assert.deepEqual(listProjectFiles(app), ["src/a.tsx"]);
+});
+
+test("node_modules inside an ignored project is never listed", async () => {
+  const { listProjectFiles } = await import("./inventory.mjs");
+  const app = ignoredApp("app/\n");
+  mkdirSync(join(app, "node_modules"), { recursive: true });
+  writeFileSync(join(app, "node_modules/x.js"), "x\n");
+  assert.deepEqual(listProjectFiles(app), ["src/a.tsx"]);
 });
