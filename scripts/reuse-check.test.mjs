@@ -1,0 +1,112 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, mkdtempSync, writeFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import { checkReuse } from "./reuse-check.mjs";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const fx = join(here, "fixtures", "reuse");
+const read = (p) => readFileSync(join(fx, p), "utf8");
+const changed = [
+  "src/components/PriceCard.tsx",
+  "src/app/pricing/layout.tsx",
+  "src/app/pricing/page.tsx",
+  "package.json",
+];
+const files = changed.map((path) => ({ path, content: read(path) }));
+const designMd = read("DESIGN.md");
+const justifications = JSON.parse(read("justifications.json"));
+const run = () => checkReuse({ designMd, files, justifications });
+
+test("new component and date-fns are justified", () => {
+  const r = run();
+  const c = r.new_components.find((x) => x.name === "PriceCard");
+  assert.equal(c.justified, true);
+  assert.equal(c.reason, "no existing card component");
+  assert.equal(r.new_components.some((x) => x.name === "Button"), false);
+  const d = r.new_packages.find((x) => x.name === "date-fns");
+  assert.equal(d.justified, true);
+  assert.equal(d.duplicates, undefined);
+});
+
+test("layout, raw colours and recharts are unjustified", () => {
+  const r = run();
+  const l = r.new_layouts.find((x) => x.file === "src/app/pricing/layout.tsx");
+  assert.equal(l.justified, false);
+  const vals = r.raw_colours.map((x) => x.value).sort();
+  assert.deepEqual(vals, ["#7b5cff", "#ff0000"]);
+  assert.ok(r.raw_colours.every((x) => !x.justified && x.file && x.line > 0));
+  const rc = r.new_packages.find((x) => x.name === "recharts");
+  assert.equal(rc.justified, false);
+  assert.equal(rc.duplicates, "chart.js");
+  assert.equal(r.new_packages.some((x) => x.name === "chart.js"), false);
+  assert.equal(r.unjustified, 4);
+  assert.equal(r.schema, 1);
+});
+
+test("token colour in any case is not reported", () => {
+  const r = run();
+  assert.equal(r.raw_colours.some((x) => x.value === "#1d6b4f"), false);
+});
+
+function cli(project, extra = []) {
+  const out = mkdtempSync(join(tmpdir(), "reuse-"));
+  const res = spawnSync(
+    process.execPath,
+    [join(here, "reuse-check.mjs"), "--project", project, "--run", out, "--files", changed.join(","), ...extra],
+    { encoding: "utf8" },
+  );
+  return { res, out };
+}
+
+test("CLI exits 1 and writes reuse.json with schema 1", () => {
+  const { res, out } = cli(fx, ["--justifications", join(fx, "justifications.json")]);
+  assert.equal(res.status, 1, res.stderr);
+  const j = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
+  assert.equal(j.schema, 1);
+  assert.equal(j.unjustified, 4);
+});
+
+test("CLI exits 0 when everything is justified", () => {
+  const all = { ...justifications, "src/app/pricing/layout.tsx": "x", "#7b5cff": "x", "#ff0000": "x", recharts: "x" };
+  const jf = join(mkdtempSync(join(tmpdir(), "just-")), "justifications.json");
+  writeFileSync(jf, JSON.stringify(all));
+  const { res, out } = cli(fx, ["--justifications", jf]);
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(JSON.parse(readFileSync(join(out, "reuse.json"), "utf8")).unjustified, 0);
+});
+
+test("missing DESIGN.md exits 2", () => {
+  const empty = mkdtempSync(join(tmpdir(), "nodesign-"));
+  const { res } = cli(empty);
+  assert.equal(res.status, 2);
+});
+
+test("without --files, untracked new files are checked too", () => {
+  const p = mkdtempSync(join(tmpdir(), "untracked-"));
+  const git = (...args) => spawnSync("git", ["-C", p, ...args], { encoding: "utf8" });
+  git("init", "-q");
+  writeFileSync(join(p, "DESIGN.md"), designMd);
+  git("add", "DESIGN.md");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+  spawnSync("mkdir", ["-p", join(p, "src/components")]);
+  writeFileSync(join(p, "src/components/PriceCard.tsx"), read("src/components/PriceCard.tsx"));
+  const out = mkdtempSync(join(tmpdir(), "reuse-"));
+  const res = spawnSync(process.execPath, [join(here, "reuse-check.mjs"), "--project", p, "--run", out], { encoding: "utf8" });
+  assert.equal(res.status, 1, res.stderr);
+  const j = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
+  assert.ok(j.new_components.some((x) => x.name === "PriceCard"));
+});
+
+test("bad JSON exits 2", () => {
+  const p = mkdtempSync(join(tmpdir(), "badjson-"));
+  writeFileSync(join(p, "DESIGN.md"), designMd);
+  writeFileSync(join(p, "package.json"), "{nope");
+  const out = mkdtempSync(join(tmpdir(), "reuse-"));
+  const res = spawnSync(process.execPath, [join(here, "reuse-check.mjs"), "--project", p, "--run", out, "--files", "package.json"], { encoding: "utf8" });
+  assert.equal(res.status, 2);
+  assert.equal(existsSync(join(out, "reuse.json")), false);
+});
