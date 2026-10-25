@@ -1,13 +1,13 @@
 ---
 slug: design-directions
-status: pursue-with-changes
+status: architected
 verdict: pursue-with-changes
 confidence: medium
 depth: standard
 isolation: isolated
 created: 2026-10-25
 updated: 2026-10-26
-related: [docs/ideas/artist-ui-plugin.md, docs/ideas/design-doc-uniformity.md, docs/plans/design-doc-uniformity.md, docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
+related: [docs/architecture/directions.rules.md, docs/architecture/directions.md, docs/ideas/artist-ui-plugin.md, docs/ideas/design-doc-uniformity.md, docs/plans/design-doc-uniformity.md, docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
 touches: [skills/create/SKILL.md, docs/design/inventory.json (read, in target projects), skills/create/references/directions.md (new), skills/create/references/web.md, skills/design-system/SKILL.md, scripts/directions.mjs (new), scripts/directions.test.mjs (new), scripts/fixtures/directions/**, evals/create/**, README.md, CHANGELOG.md, docs/architecture/plugin.rules.md, docs/architecture/plugin.md, docs/architecture/verify.rules.md, docs/architecture/verify.md]
 ---
 
