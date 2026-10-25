@@ -9,7 +9,7 @@ tracker_rows: [artist-ui-plugin#scaffold, artist-ui-plugin#verify-tests, artist-
 guards:
   blast_radius: done
   completeness_sweep: done
-  blind_rederivation: pending
+  blind_rederivation: explore-agent (2026-10-25; 8 gaps folded in, 1 deferred to Out of scope)
 coverage:
   contract:      2.1, 3.1, 5.3, 8.1, 8.2 (report.json schema 1 and verify CLI exit codes are the only internal contract; DESIGN.md format 1 is read by craftsman ui-ux-reviewer + design-review)
   data:          N/A(no database; files only: .artist/runs/<ts>/ and docs/design/DESIGN.md in target projects)
@@ -31,7 +31,7 @@ units:
     scope:
       read: []
       docs: [docs/architecture/plugin.rules.md, docs/architecture/verify.rules.md]
-      write: [.claude-plugin/plugin.json, .claude-plugin/marketplace.json, .mcp.json, scripts/package.json, scripts/package-lock.json, .gitignore]
+      write: [.claude-plugin/plugin.json, .claude-plugin/marketplace.json, .mcp.json, scripts/package.json, scripts/package-lock.json, .gitignore, LICENSE]
     arch: [ARCH-PLUGIN-03, ARCH-PLUGIN-04, ARCH-PLUGIN-05, ARCH-PLUGIN-06, ARCH-PLUGIN-19, ARCH-VERIFY-05]
     tooling: { implementer: implementer, gates: [dependency-auditor], skills: [], guards: [secrets-scan], mcp: [] }
   - id: 2
@@ -154,6 +154,7 @@ Depends on: none
   - name `artist`, displayName `Artist`, version `0.1.0`
   - one-sentence description, author `{name: "Kieran"}`, license MIT, keywords
   - no `dependencies`, no `hooks`, no `commands` key
+  - no `userConfig` in v1: neither bundled server needs a key (opt-in servers in the README show their own sensitive `userConfig` snippet)
 
   → accept: `claude plugin validate .` passes (warnings allowed until Step 9); `grep -c craftsman .claude-plugin/plugin.json` = 0
 - [ ] 1.2 Write `.claude-plugin/marketplace.json` listing exactly one plugin, `artist`, with source `./` → accept: `claude plugin validate .claude-plugin/marketplace.json` passes; one entry
@@ -170,6 +171,7 @@ Depends on: none
   → accept: no `^`/`~` in the file
 - [ ] 1.5 Generate `scripts/package-lock.json` with `npm install --package-lock-only --prefix scripts`. This is a network step: run it in root, outside the sandbox (craftsman `_network.md`) → accept: the lockfile resolves those three exact versions
 - [ ] 1.6 Write `.gitignore` with `node_modules/` and `.artist/` → accept: file has both lines
+- [ ] 1.7 Write `LICENSE` (MIT, 2026, Kieran) to match `plugin.json` → accept: file starts with `MIT License`
 
 ### Step 2 — verify-tests (artist, node ESM, high), tests first and failing
 Tooling: implementer · gates security-auditor · skills test-driven-development
@@ -207,7 +209,7 @@ Depends on: verify-tests
   - Each page load has a 30 s timeout; the browser is closed in a `finally`.
   - The run folder is created with an exclusive `mkdir`; on `EEXIST` it appends a short suffix, so concurrent runs never share a folder.
   - One screenshot per breakpoint.
-  - axe via `@axe-core/playwright`.
+  - axe via `@axe-core/playwright` at every breakpoint; each impact count is the maximum across breakpoints, and `violations` is de-duplicated by rule id with the breakpoints it appeared at.
   - LCP/CLS: inject `web-vitals/dist/web-vitals.umd.cjs`, read `onLCP`/`onCLS` with `reportAllChanges`, over 3 fresh page loads; report the median.
   - Write `report.json` (schema 1) under `<project>/.artist/runs/<UTC-compact-timestamp>/`.
   - Catch every browser or launch error → exit 2 with a message on stderr; never exit 0 on an error.
@@ -233,9 +235,9 @@ Depends on: verify-tests
   - rubric table per round: 8 dimensions, plus a NOT ISOLATED badge when `isolated === false`
   - axe counts and top violations
   - CWV: median, spread, unstable flag
-  - DESIGN.md token diff
+  - DESIGN.md token diff, shape `{added:[{name,value}], removed:[name], changed:[{name,from,to}]}`
 
-  Use inline CSS and JS, images by relative path, and light/dark via `prefers-color-scheme` → accept: 4.2 passes
+  Scores in `rounds.json` are an object keyed by the 8 rubric dimension names, values 1–5. Use inline CSS and JS, images by relative path, and light/dark via `prefers-color-scheme` → accept: 4.2 passes
 - [ ] 4.2 Write `scripts/review-html.test.mjs` and `scripts/fixtures/report.sample.json`. Check that:
   - the output has every section heading;
   - no `src=`/`href=` value starts with `http`;
@@ -254,12 +256,13 @@ Depends on: verify-impl
   - Include the untrusted-content sentence.
 
   → accept: under 500 lines; one-sentence `description`; the only skill that writes DESIGN.md
-- [ ] 5.2 Write `skills/design-system/references/design-template.md` with frontmatter `format: 1` and sections Tokens, Type scale, Spacing, Components, Motion, Platform notes → accept: all six headings present
+- [ ] 5.2 Write `skills/design-system/references/design-template.md` with frontmatter `format: 1` and sections Tokens, Type scale, Spacing, Components, Motion, Platform notes. Tokens are a markdown table `| name | value | use |` with dotted names (`color.brand.primary`, `space.4`, `radius.card`). Platform notes holds the dev URL and start command (`dev url: http://localhost:3000`, `start: npm run dev`) → accept: all six headings present; the token table header matches
 - [ ] 5.3 Write `skills/verify/SKILL.md`:
   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/verify.mjs" <url>`, read report.json, and explain each failure.
   - Use the playwright and chrome-devtools MCP tools only to diagnose (trace for LCP/CLS, DOM for axe), never as a source of scores.
   - State the exit-code meanings exactly as `verify.mjs` defines them.
-  - On exit 2 from missing deps, give the install step.
+  - URL: use the one the user gave, else DESIGN.md's `dev url`. Skills never start the dev server; if the URL doesn't respond, tell the user the start command from DESIGN.md or package.json and stop.
+  - On exit 2 from missing deps, show the install command, run it only after the user agrees (it needs network), then retry once. Offline → report the exit 2 and stop.
 
   → accept: exit codes match `exitCodeFor`; contains the untrusted-content sentence
 - [ ] 5.4 Write `skills/optimise/SKILL.md`:
@@ -274,6 +277,8 @@ Depends on: verify-impl
 Depends on: verify-impl, review-html
 - [ ] 6.1 Write `skills/create/SKILL.md`:
   - Read DESIGN.md (run design-system init first if it's missing), plus `references/web.md` or `mobile.md` for the detected stack.
+  - Get the URL the same way as the verify skill (user's URL, else DESIGN.md `dev url`; never start the server).
+  - Parse the critic's 8 lines (`dimension: score — reason`) into the `rounds.json` scores object; a malformed reply counts as a failed dispatch (NOT ISOLATED fallback).
   - Loop up to 3 rounds: build or refine → `verify.mjs` → dispatch `artist:design-critic` once, with only the screenshots, report.json, DESIGN.md and the rubric.
   - Stop when every score ≥ 4, axe serious+critical = 0, LCP ≤ 2500 ms, CLS ≤ 0.1, and CWV is not unstable.
   - If the dispatch is blocked or fails, run the critic brief in-session and mark the round NOT ISOLATED. Never retry or run critics in parallel.
@@ -295,7 +300,7 @@ Depends on: verify-impl, review-html
   → accept: the `tools:` line is exactly `Read, Glob`
 - [ ] 6.4 Write the two platform references:
   - `skills/create/references/web.md`: React/Next/Tailwind/shadcn patterns; Next DevTools MCP as an opt-in with `NEXT_TELEMETRY_DISABLED=1`.
-  - `skills/create/references/mobile.md`: Expo/React Native (`accessible`, `accessibilityLabel`, `accessibilityRole`, safe-area insets, `Platform.select`); verification via Expo web or user screenshots.
+  - `skills/create/references/mobile.md`: Expo/React Native (`accessible`, `accessibilityLabel`, `accessibilityRole`, safe-area insets, `Platform.select`); verification via Expo web (`npx expo start --web`, default `http://localhost:8081`) or user screenshots saved to `.artist/manual/<width>.png`, which create passes to the critic in place of verify's screenshots (CWV/axe then marked not measured).
 
   → accept: both files exist, and SKILL.md links to them rather than inlining them
 
@@ -368,3 +373,4 @@ CONSUMERS:
 - Bundling the other listed integrations (they are README snippets only, ARCH-PLUGIN-21).
 - Hooks, re-routing craftsman's `ui` gate, and any guard code changes.
 - INP and field metrics; measurement of native-only mobile screens.
+- Retargeting craftsman's Slice E (`docs/ideas/plugin-overhaul.md:275-283`) to "consume artist's DESIGN.md": only craftsman's own `/idea` may write its idea docs. Follow-up: run `/idea` re-evaluation of plugin-overhaul in craftsman.
