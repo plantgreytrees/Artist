@@ -1,0 +1,15 @@
+{
+  "sandbox": {
+    "enabled": true
+  },
+  "permissions": {
+    "ask": [
+      "Bash(rm -r *)",
+      "Bash(rm -rf *)",
+      "Bash(sudo *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)"
+    ]
+  }
+}

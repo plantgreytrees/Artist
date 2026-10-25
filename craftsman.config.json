@@ -1,0 +1,7 @@
+{
+  "stopGate": {
+    "commands": {
+      "package.json": "npm test --silent"
+    }
+  }
+}
