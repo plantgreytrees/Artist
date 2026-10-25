@@ -365,6 +365,18 @@ test("thin wrappers sharing only children are not near-duplicates", () => {
   const files = [
     { path: "src/components/Card.tsx", content: "type CardProps = { children: React.ReactNode };\nexport function Card({ children }: CardProps) { return <div>{children}</div>; }\n" },
     { path: "src/components/Panel.tsx", content: "type PanelProps = { children: React.ReactNode };\nexport function Panel({ children }: PanelProps) { return <section>{children}</section>; }\n" },
+    { path: "src/components/Box.tsx", content: "type BoxProps = { children: React.ReactNode; className?: string };\nexport function Box({ children, className }: BoxProps) { return <div className={className}>{children}</div>; }\n" },
+    { path: "src/components/Frame.tsx", content: "type FrameProps = { children: React.ReactNode; className?: string };\nexport function Frame({ children, className }: FrameProps) { return <section className={className}>{children}</section>; }\n" },
+  ];
+  const r = checkReuse({ designMd, files, all: true, inventory: { components: [], layouts: [], schemas: [] } });
+  assert.deepEqual(r.near_duplicates, []);
+});
+
+test("components sharing a single meaningful prop are not near-duplicates", () => {
+  const designMd = readFileSync(join(here, "fixtures/reuse/DESIGN.md"), "utf8");
+  const files = [
+    { path: "src/components/Price.tsx", content: "type PriceProps = { price: string };\nexport function Price({ price }: PriceProps) { return <span>{price}</span>; }\n" },
+    { path: "src/components/Cost.tsx", content: "type CostProps = { price: string };\nexport function Cost({ price }: CostProps) { return <b>{price}</b>; }\n" },
   ];
   const r = checkReuse({ designMd, files, all: true, inventory: { components: [], layouts: [], schemas: [] } });
   assert.deepEqual(r.near_duplicates, []);

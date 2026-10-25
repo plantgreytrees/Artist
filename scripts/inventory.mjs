@@ -3,8 +3,9 @@
 // <project>/docs/design/inventory.json and rewrites only the marked section of
 // <project>/docs/design/DESIGN.md (falls back to <project>/DESIGN.md when the
 // former does not exist). Exit 0 on success, 2 on error.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, realpathSync, lstatSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, existsSync, readdirSync, realpathSync, lstatSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -258,10 +259,28 @@ export function renderSections(inv) {
 const SKIP_DIRS = new Set(["node_modules", ".artist", ".git", ".worktrees"]);
 const skipped = (rel) => rel.split("/").some((seg) => SKIP_DIRS.has(seg));
 const isRegular = (abs) => { try { return lstatSync(abs).isFile(); } catch { return false; } };
+// Build output the walk never descends into, even without a .gitignore.
+const WALK_SKIP = new Set([...SKIP_DIRS, "dist", "build", "out", ".next", ".turbo", "coverage"]);
+
+// Names the project's own .gitignore files exclude, judged against a throwaway
+// git dir whose work tree is the project, so a parent repo's rule that ignores
+// the whole project does not apply. No git → nothing is excluded.
+function ownIgnored(project, names) {
+  if (!names.length) return new Set();
+  const gitDir = mkdtempSync(join(tmpdir(), "artist-ignore-"));
+  try {
+    execFileSync("git", ["init", "-q", "--bare", gitDir], { stdio: "pipe" });
+    const out = execFileSync("git", ["--git-dir", gitDir, "--work-tree", project, "check-ignore", "--no-index", "-z", "--stdin"],
+      { cwd: project, input: names.join("\0") + "\0", encoding: "utf8", maxBuffer: 1 << 28, stdio: ["pipe", "pipe", "pipe"] });
+    return new Set(out.split("\0").filter(Boolean));
+  } catch { return new Set(); } finally { rmSync(gitDir, { recursive: true, force: true }); }
+}
 
 // Every existing regular project file, relative posix paths, sorted. In a git
 // repo: tracked + untracked-not-ignored (so ignored build output is excluded and
-// unstaged deletions are dropped). Outside git: a filesystem walk.
+// unstaged deletions are dropped). Outside git, or in a folder its parent repo
+// ignores: a filesystem walk that skips WALK_SKIP and honours the project's own
+// .gitignore files.
 export function listProjectFiles(project) {
   let names = null;
   try {
@@ -277,11 +296,13 @@ export function listProjectFiles(project) {
     names = [];
     const rec = (dir) => {
       for (const e of readdirSync(dir, { withFileTypes: true })) {
-        if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) rec(join(dir, e.name)); continue; }
+        if (e.isDirectory()) { if (!WALK_SKIP.has(e.name)) rec(join(dir, e.name)); continue; }
         if (e.isFile()) names.push(relative(project, join(dir, e.name)).split(sep).join("/"));
       }
     };
     rec(project);
+    const ignored = ownIgnored(project, names);
+    names = names.filter((n) => !ignored.has(n));
   }
   return uniqSorted(names.filter((n) => !skipped(n) && isRegular(join(project, n))));
 }
