@@ -57,8 +57,10 @@ const median = (xs) => {
 
 export function summariseCwv(samples) {
   const lcps = samples.map((s) => s.lcp_ms);
-  const lcp_ms = median(lcps);
-  const range = Math.max(...lcps) - Math.min(...lcps);
+  const numeric = lcps.filter((x) => typeof x === "number");
+  // A sample with neither LCP nor FCP makes the whole LCP unknown, never a pass.
+  const lcp_ms = numeric.length === lcps.length && numeric.length ? median(numeric) : null;
+  const range = numeric.length ? Math.max(...numeric) - Math.min(...numeric) : 0;
   const spread = lcp_ms > 0 ? range / lcp_ms : 0;
   return {
     lcp_ms,
@@ -69,10 +71,16 @@ export function summariseCwv(samples) {
   };
 }
 
+export function reportPathFor(result = {}) {
+  if (!result.runDir) return null;
+  const file = path.join(result.runDir, "report.json");
+  return fs.existsSync(file) ? file : null;
+}
+
 export function exitCodeFor({ axe, cwv, error } = {}) {
   if (error || !axe || !cwv) return 2;
   if ((axe.serious || 0) + (axe.critical || 0) > 0) return 1;
-  if (cwv.unstable || !(cwv.lcp_ms <= THRESHOLDS.lcp_ms) || !(cwv.cls <= THRESHOLDS.cls)) return 1;
+  if (cwv.unstable || typeof cwv.lcp_ms !== "number" || !(cwv.lcp_ms <= THRESHOLDS.lcp_ms) || !(cwv.cls <= THRESHOLDS.cls)) return 1;
   return 0;
 }
 
@@ -115,19 +123,23 @@ const offLoopback = (host) => new RemoteRedirect(`page redirected off loopback t
 
 // Stops a navigation before it leaves loopback: JS-driven navigations are aborted,
 // and HTTP redirects are fetched without following so their Location is checked first.
+// Only main-frame navigations of the measured page (state.page, set after newPage)
+// fail the run; off-loopback sub-frames and popups are aborted silently.
 async function guardNavigation(context, allowRemote) {
-  const state = { blocked: null };
+  const state = { blocked: null, page: null };
   if (allowRemote) return state;
   await context.route("**/*", async (route) => {
     const request = route.request();
     if (!request.isNavigationRequest()) return route.continue();
     const target = new URL(request.url());
-    if (!isLoopback(target.hostname)) { state.blocked = target.hostname; return route.abort("blockedbyclient"); }
+    const main = !state.page || request.frame() === state.page.mainFrame();
+    const block = (host) => { if (main) state.blocked = host; return route.abort("blockedbyclient"); };
+    if (!isLoopback(target.hostname)) return block(target.hostname);
     const response = await route.fetch({ maxRedirects: 0 });
     const location = response.headers().location;
     if (response.status() >= 300 && response.status() < 400 && location) {
       const next = new URL(location, request.url());
-      if (!isLoopback(next.hostname)) { state.blocked = next.hostname; return route.abort("blockedbyclient"); }
+      if (!isLoopback(next.hostname)) return block(next.hostname);
     }
     return route.fulfill({ response });
   });
@@ -157,13 +169,15 @@ async function measureVitals(browser, url, width, deps, allowRemote) {
     const guard = await guardNavigation(context, allowRemote);
     await context.addInitScript({ content: deps.vitalsSource + VITALS_HOOK });
     const page = await context.newPage();
+    guard.page = page;
     await gotoLocal(page, url, guard, allowRemote);
     await page.waitForTimeout(1000);
     return await page.evaluate(() => {
       const v = window.__artistVitals || {};
       // A page with no LCP candidate falls back to first contentful paint.
       const fcp = performance.getEntriesByName("first-contentful-paint")[0];
-      return { lcp_ms: Math.round(v.lcp ?? (fcp ? fcp.startTime : 0)), cls: Number(v.cls || 0) };
+      const lcp = v.lcp ?? (fcp ? fcp.startTime : null);
+      return { lcp_ms: lcp === null ? null : Math.round(lcp), cls: Number(v.cls || 0) };
     });
   } finally {
     await context.close().catch(() => {});
@@ -194,6 +208,7 @@ export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_
       try {
         const guard = await guardNavigation(context, allowRemote);
         const page = await context.newPage();
+        guard.page = page;
         await gotoLocal(page, url, guard, allowRemote);
         const file = `${width}.png`;
         await page.screenshot({ path: path.join(runDir, file), fullPage: true, timeout: LOAD_TIMEOUT_MS });
@@ -202,9 +217,13 @@ export async function run({ url, project = process.cwd(), breakpoints = DEFAULT_
         const counts = Object.fromEntries(IMPACTS.map((k) => [k, 0]));
         for (const v of result.violations) {
           if (counts[v.impact] !== undefined) counts[v.impact]++;
-          const seen = violations.get(v.id) || { id: v.id, impact: v.impact, help: v.help, nodes: 0, breakpoints: [] };
+          const seen = violations.get(v.id) || { id: v.id, impact: v.impact, help: v.help, nodes: 0, breakpoints: [], targets: [] };
           seen.nodes = Math.max(seen.nodes, v.nodes.length);
           seen.breakpoints.push(width);
+          for (const n of v.nodes) {
+            const t = Array.isArray(n.target) ? n.target.join(" ") : String(n.target);
+            if (seen.targets.length < 5 && t && !seen.targets.includes(t)) seen.targets.push(t);
+          }
           violations.set(v.id, seen);
         }
         for (const k of IMPACTS) axe[k] = Math.max(axe[k], counts[k]);
@@ -243,7 +262,8 @@ if (invokedDirectly) {
   if (args) {
     const result = await run({ ...args, project: args.project || process.cwd() });
     if (result.error) console.error(`verify: ${result.error}`);
-    if (result.runDir) console.log(path.join(result.runDir, "report.json"));
+    const reportPath = reportPathFor(result);
+    if (reportPath) console.log(reportPath);
     process.exitCode = result.exitCode;
   }
 }

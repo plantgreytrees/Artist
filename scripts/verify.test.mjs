@@ -11,6 +11,7 @@ import {
   summariseCwv,
   exitCodeFor,
   resolveDeps,
+  reportPathFor,
   run,
 } from "./verify.mjs";
 
@@ -102,6 +103,43 @@ describe("summariseCwv", () => {
   });
 });
 
+describe("summariseCwv null LCP", () => {
+  test("any null LCP sample gives lcp_ms null", () => {
+    const s = summariseCwv([
+      { lcp_ms: 1000, cls: 0 },
+      { lcp_ms: null, cls: 0 },
+      { lcp_ms: 1100, cls: 0 },
+    ]);
+    assert.equal(s.lcp_ms, null);
+    assert.equal(s.unstable, false);
+  });
+});
+
+describe("reportPathFor", () => {
+  test("null when report.json was not written", () => {
+    const dir = tmp("artist-run-");
+    assert.equal(reportPathFor({ runDir: dir }), null);
+    assert.equal(reportPathFor({}), null);
+  });
+  test("path when report.json exists", () => {
+    const dir = tmp("artist-run-");
+    fs.writeFileSync(path.join(dir, "report.json"), "{}");
+    assert.equal(reportPathFor({ runDir: dir }), path.join(dir, "report.json"));
+  });
+});
+
+describe("launch failure", () => {
+  test("a launch that throws exits 2 with an error", async () => {
+    const res = await run({
+      url: "http://127.0.0.1:1/",
+      project: tmp("artist-proj-"),
+      launch: () => { throw new Error("no browser"); },
+    });
+    assert.equal(res.exitCode, 2);
+    assert.match(res.error || "", /no browser/);
+  });
+});
+
 describe("exitCodeFor", () => {
   const good = {
     axe: { critical: 0, serious: 0, moderate: 0, minor: 0 },
@@ -116,6 +154,8 @@ describe("exitCodeFor", () => {
     assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, cls: 0.9 } }), 1));
   test("1 when CWV unstable", () =>
     assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, unstable: true } }), 1));
+  test("1 when LCP is null (no LCP or FCP)", () =>
+    assert.equal(exitCodeFor({ ...good, cwv: { ...good.cwv, lcp_ms: null } }), 1));
   test("2 on tool error", () =>
     assert.equal(exitCodeFor({ error: new Error("boom") }), 2));
 });
@@ -184,12 +224,23 @@ describe("browser integration", { skip: skipBrowser }, () => {
     assert.match(res.error || "", /loopback/);
   });
 
+  test("a remote sub-frame is aborted but does not fail the run", async () => {
+    const res = await run({ url: `${base}/iframe.html`, project: tmp("artist-proj-") });
+    assert.equal(res.error, undefined);
+    assert.ok(res.exitCode === 0 || res.exitCode === 1, `exit ${res.exitCode}`);
+  });
+
   test("axe-violation.html fails with serious or critical issues", async () => {
     const project = tmp("artist-proj-");
     const res = await run({ url: `${base}/axe-violation.html`, project });
     assert.equal(res.exitCode, 1);
     const report = JSON.parse(fs.readFileSync(path.join(res.runDir, "report.json"), "utf8"));
     assert.ok(report.axe.serious + report.axe.critical >= 1);
+    assert.ok(report.axe.violations.length >= 1);
+    for (const v of report.axe.violations) {
+      assert.ok(Array.isArray(v.targets) && v.targets.length > 0, `targets for ${v.id}`);
+      assert.ok(v.targets.every((t) => typeof t === "string" && t.length > 0));
+    }
     const runsRoot = path.join(project, ".artist", "runs");
     assert.ok(res.runDir.startsWith(runsRoot + path.sep));
     for (const f of listFiles(project)) {
