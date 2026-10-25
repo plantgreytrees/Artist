@@ -124,3 +124,60 @@ export function tokensOf(md) {
 
 export const componentTokensOf = (md) => tableOf(md, "Component tokens");
 export const decisionsOf = (md) => tableOf(md, "Decisions");
+
+// Token binding (ARCH-VERIFY-26). Each token gets its CSS variable and a ratio category.
+const SHAPES = [
+  [/^(#[0-9a-f]{3,8}|(rgba?|hsla?|oklch|oklab|lab|lch|hwb|color)\(.*\))$/i, "colours"],
+  [/^-?\d*\.?\d+(px|rem|em)$/i, "spacing"],
+  [/^(-?\d*\.?\d+m?s|cubic-bezier\(.*\)|steps\(.*\)|linear\(.*\))$/i, "motion"],
+];
+const PREFIXES = [
+  [/^(color|colour)\b/i, "colours"],
+  [/^(space|spacing)\b/i, "spacing"],
+  [/^(motion|duration|ease|transition)\b/i, "motion"],
+];
+
+export function categoryOf(name, value) {
+  const v = String(value ?? "").trim();
+  for (const [re, cat] of SHAPES) if (re.test(v)) return cat;
+  for (const [re, cat] of PREFIXES) if (re.test(String(name ?? "").trim())) return cat;
+  return null;
+}
+
+// Bound tokens: [{ name, variable, value, kind, category|null }].
+export function bindTokens(md) {
+  const t = tokensOf(md);
+  const prim = new Map(t.primitives.map((r) => [r.name, r.value]));
+  const light = new Map();
+  for (const r of t.themes) if (!light.has(r.token)) light.set(r.token, r.light);
+  const out = [];
+  for (const r of t.semantic) {
+    const variable = (r.variable ?? "").trim();
+    if (!variable) continue;
+    const value = light.get(r.name) || prim.get(r.primitive) || r.value || "";
+    out.push({ name: r.name, variable, value, kind: "semantic", category: categoryOf(r.name, value) });
+  }
+  const scaled = [
+    ["type", t.typeScale],
+    ["spacing", t.spacing],
+    ["motion", t.motion],
+  ];
+  for (const [kind, rows] of scaled) {
+    for (const r of rows) {
+      if (!r.name) continue;
+      const variable = (r.variable ?? "").trim() || `--${r.name.replace(/\./g, "-")}`;
+      const value = r.value ?? "";
+      out.push({ name: r.name, variable, value, kind, category: categoryOf(r.name, value) });
+    }
+  }
+  return out;
+}
+
+// Tailwind v4 `--spacing` base in px, read from token-file text (default 0.25rem, 1rem = 16px).
+export function spacingBaseOf(texts) {
+  for (const text of Array.isArray(texts) ? texts : [texts]) {
+    const m = /--spacing\s*:\s*(-?\d*\.?\d+)\s*(rem|px)\b/.exec(String(text ?? ""));
+    if (m) return Number(m[1]) * (m[2] === "rem" ? 16 : 1);
+  }
+  return 4;
+}

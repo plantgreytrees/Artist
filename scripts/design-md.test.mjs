@@ -11,6 +11,9 @@ import {
   tokensOf,
   componentTokensOf,
   decisionsOf,
+  bindTokens,
+  categoryOf,
+  spacingBaseOf,
 } from "./design-md.mjs";
 
 const fixture = (p) => readFileSync(fileURLToPath(new URL(p, import.meta.url)), "utf8");
@@ -106,4 +109,43 @@ test("componentTokensOf and decisionsOf read their tables", () => {
 test("design-md.mjs is pure: no node:fs or child_process", () => {
   const src = readFileSync(fileURLToPath(new URL("./design-md.mjs", import.meta.url)), "utf8");
   assert.doesNotMatch(src, /node:fs|child_process/);
+});
+
+const BIND_MD =
+  "## Themes\n| brand | token | light | dark |\n|---|---|---|---|\n| d | color.brand | #1d6b4f | #000 |\n\n" +
+  "## Semantic tokens\n| variable | name | primitive | use |\n|---|---|---|---|\n| --color-brand | color.brand | green | u |\n| --elev | elevation.1 | shadow | u |\n\n" +
+  "## Type scale\n| name | value | variable |\n|---|---|---|\n| text.lg | 1.125rem | --text-lg |\n| text.sm | 0.875rem | |\n\n" +
+  "## Spacing\n| name | value |\n|---|---|\n| space.4 | 16px |\n\n" +
+  "## Motion\n| name | value |\n|---|---|\n| motion.fast | 150ms |\n| motion.ease.out | cubic-bezier(0,0,.2,1) |\n";
+
+test("bindTokens: semantic binds to variable; scale tokens to variable cell else --name with dots as dashes", () => {
+  const b = Object.fromEntries(bindTokens(BIND_MD).map((t) => [t.name, t]));
+  assert.equal(b["color.brand"].variable, "--color-brand");
+  assert.equal(b["color.brand"].value, "#1d6b4f");
+  assert.equal(b["text.lg"].variable, "--text-lg");
+  assert.equal(b["text.sm"].variable, "--text-sm");
+  assert.equal(b["space.4"].variable, "--space-4");
+  assert.equal(b["motion.ease.out"].variable, "--motion-ease-out");
+});
+
+test("bindTokens: category from value shape, name prefix as tie-break, else null", () => {
+  const b = Object.fromEntries(bindTokens(BIND_MD).map((t) => [t.name, t]));
+  assert.equal(b["color.brand"].category, "colours");
+  assert.equal(b["space.4"].category, "spacing");
+  assert.equal(b["motion.fast"].category, "motion");
+  assert.equal(b["motion.ease.out"].category, "motion");
+  assert.equal(b["elevation.1"].category, null);
+  assert.equal(categoryOf("color.x", ""), "colours");
+  assert.equal(categoryOf("space.x", "weird"), "spacing");
+  assert.equal(categoryOf("other", "oklch(0.5 0.1 200)"), "colours");
+  assert.equal(categoryOf("color.x", "2s"), "motion");
+});
+
+test("spacingBaseOf reads --spacing statically, defaulting to 0.25rem (4px)", () => {
+  assert.equal(spacingBaseOf(["@theme { --color-a: red; }"]), 4);
+  assert.equal(spacingBaseOf(["@theme { --spacing: 0.25rem; }"]), 4);
+  assert.equal(spacingBaseOf(["a", "@theme { --spacing: 4px; }"]), 4);
+  assert.equal(spacingBaseOf(["@theme { --spacing: 8px; }"]), 8);
+  assert.equal(spacingBaseOf(["@theme { --spacing: 0.5rem; }"]), 8);
+  assert.equal(spacingBaseOf([]), 4);
 });
