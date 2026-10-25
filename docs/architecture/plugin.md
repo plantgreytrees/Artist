@@ -151,18 +151,46 @@ flowchart LR
 | ARCH-PLUGIN-29 (supersedes 25) | DESIGN.md stays format 2 and gains two optional sections: Component tokens (Bootstrap-style, only for components with variants or brand overrides, each aliasing a semantic token) and Decisions (`id, decision, why, date, supersedes`). On-scale Tailwind v4 spacing multiples count as token use; breakpoints remain literal | additive, so no project has to re-run init; restyle one component without touching others; rationale stops "fixes" to deliberate choices | format 3 (forces every project through the rerun path); a component token for every component (variable bloat); only named spacing tokens conform (nearly every Tailwind project fails) |
 | ARCH-PLUGIN-30 (supersedes 27) | init and audit also regenerate the HTML doc; audit's consistency.md shows a four-number ratio per category beside the findings | the team doc can't drift silently; counts mean something only with a denominator | HTML on demand only; counts without totals |
 | ARCH-PLUGIN-31 | Only design-system (via design-doc.mjs) writes the committed `docs/design/design-system.html`; no live-tweak panel yet | same single-writer rule as DESIGN.md; a JS-free page has the smallest injection surface | gitignored `.artist/design/` output; live-tweak panel in slice 1 |
-| ARCH-PLUGIN-32 | init proposes token-file diffs (incl. a v3 `var()` migration from a static parse) and applies them only on acceptance; nothing ever executes project config | owner wants variables everywhere without the plugin silently editing code; executing `tailwind.config.js` would run untrusted code | init owns and regenerates token files; document only |
+| ARCH-PLUGIN-32 (superseded by 38) | init proposes token-file diffs and applies them only on acceptance; nothing ever executes project config | owner wants variables everywhere without the plugin silently editing code; executing `tailwind.config.js` would run untrusted code | init owns and regenerates token files; document only |
 | ARCH-PLUGIN-33 | Decisions proposed by init with evidence, confirmed by the user, append-only via `supersedes`; deprecations worded `Deprecate <Name>` | ADR-style history; inventory's existing deprecation scan reads these rows, so the wording makes it intentional | human-written only; excluding Decisions from the deprecation scan |
 | ARCH-PLUGIN-34 | Ratios never gate `create`, never reach the critic, never blend into one score; justified ≠ conforming | Goodhart: a single gameable number distorts the loop | one 0–100 score; ratios as a stop criterion |
 
 **Trade-offs:**
-- Tailwind v3 projects whose config holds literal colours score low until they accept init's proposed `var()` migration.
+- Tailwind v3 (JS config) projects are not supported as a token source; init points them to `@theme` (see the deep-review amendment below).
 - The committed HTML changes whenever the inventory changes. That is by design, because it is deterministic and has no timestamp churn.
 - Whether teammates actually open the HTML is unproven. If nobody uses it within a month, stop committing it (the idea's kill criterion).
 
 **Rollout:** three slices, each revertible on its own:
 1. HTML doc + Decisions.
-2. Token resolver, Component tokens and init's proposal step. A half-day spike on the v3 static parse comes first.
+2. Token resolver, Component tokens and init's proposal step. A half-day spike first checks whether a `var()`-only reference makes Tailwind emit a theme variable; `@theme static` is the safe default either way.
 3. Ratios and `reuse.json` schema 3.
 
 The plugin version goes to 0.2.0.
+
+## Amendment 2026-10-25 (deep review): Tailwind v4 only, strict component tokens, testable checks
+Source: an isolated `/architect --deep` review of the design-doc-uniformity rules against the code, plus four owner decisions. It supersedes ARCH-PLUGIN-29..34 with 35..40 and adds 41. Intent is unchanged; the edits remove v3, settle what the review found ambiguous, and make each `check:` mechanical.
+
+```mermaid
+flowchart LR
+  TW[Tailwind v4 @theme / @theme static] --> V[(CSS variables on :root)]
+  BS[Bootstrap --bs-* overrides] --> V
+  V --> SEM[Semantic tokens]
+  SEM --> CT[Component tokens<br/>--button-padding-x → space.4]
+  CT --> C[Components]
+  SEM --> C
+  CFG[tailwind.config.* / @config] -. "not parsed: init proposes @theme" .-> TW
+```
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-PLUGIN-35 (supersedes 29) | Type scale, Spacing and Motion may carry an optional `variable` column (else bound by naming convention). Every component with variants needs a Component tokens block, and a missing block counts `unjustified` in its ratio. Numeric spacing counts only for `p*`/`m*`/`gap*`/`space-x\|y` | owner wants every variant component restyleable by variable; "MAY" alone left a variant component with no block neither conforming nor failing | required `variable` column (forces every DESIGN.md to migrate); counting only existing blocks (a project with none shows 0/0) |
+| ARCH-PLUGIN-36 (supersedes 30) | design-doc runs once per mode: after inventory on init, after consistency.md with `--reuse` on audit | the old wording read as two runs on audit | rendering twice |
+| ARCH-PLUGIN-37 (supersedes 31) | the HTML has no `<script>` element at all and carries a strict CSP meta | "no script that mutates styles" could not be checked mechanically; a CSP adds defence in depth at no cost from `file://` | allowing non-mutating scripts |
+| ARCH-PLUGIN-38 (supersedes 32) | Tailwind is v4 CSS-first only. init proposes semantic tokens in `@theme static`, so aliased variables always exist. A JS config or `@config` gets a "not parsed, use `@theme`" note | owner decision; v4 does not auto-load JS configs (tailwindcss.com/docs/upgrade-guide); only used variables are emitted unless `static` (tailwindcss.com/docs/theme) | static parse of v3 `theme.extend`; relying on `var()` counting as a use (unverified) |
+| ARCH-PLUGIN-39 (supersedes 33) | `Deprecate <Name>` must be the exact decision cell; init converts prose deprecations into such rows | the old scan matched any line containing "deprecated" and a component name (`inventory.mjs:90`), so "Modal is deprecated in favour of Dialog" deprecated both | keeping the loose prose scan |
+| ARCH-PLUGIN-40 (supersedes 34) | adds that advisory lists are never counted; the HTML shows ratios only when `--reuse` was given | init has no reuse.json, so the old check was untestable on init | — |
+| ARCH-PLUGIN-41 | the skills, template and eval describe Tailwind only as v4 `@theme` | `skills/create/references/web.md:11` and `evals/design-system/prompt.md:7` still teach a v3 JS config | keeping v3 examples as "also works" |
+
+**Trade-offs:**
+- Strict component tokens will show many `unjustified` items on the first audit of an existing project. That is intended; each can be fixed or justified.
+- Dropping the prose deprecation scan changes behaviour for existing DESIGN.md files. init's proposed `Deprecate` rows are what keep this from being silent.

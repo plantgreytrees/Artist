@@ -94,4 +94,33 @@ flowchart LR
 
 **Known limits:**
 - Site counting is regex-based, so CSS-in-JS, Vue/Svelte SFCs and vendored CSS can be miscounted. Every ratio reports `total`, so readers can sanity-check it.
-- A v3 config using `require()`d themes or closures is beyond the static parse.
+- Tailwind v3 JS configs are never parsed (v4 CSS-first only, ARCH-PLUGIN-38).
+
+## Amendment 2026-10-25 (deep review): counting units, binding, the class tokenizer
+Supersedes ARCH-VERIFY-18..20 with 21..23 and adds 24..26, after an isolated review traced the rules against `reuse-check.mjs`, `inventory.mjs` and the Tailwind v4 docs.
+
+```mermaid
+flowchart LR
+  DMD[(DESIGN.md)] --> MD[design-md.mjs<br/>pure, header-named tables]
+  TF[(token files: @theme CSS)] -->|text only| INV
+  MD --> TR[token-refs.mjs<br/>pure: bind, categorise, tokenize]
+  TR --> INV[inventory.mjs]
+  INV --> RC[reuse-check.mjs]
+  RC -->|--all only| R[(ratios + component_token_literals<br/>+ advisory off_token_classes, prop_synonyms)]
+  MD --> DD[design-doc.mjs]
+  TR --> DD
+  R -->|--reuse| DD
+```
+
+| id | decision | why | rejected alternatives |
+|---|---|---|---|
+| ARCH-VERIFY-21 (supersedes 18) | Ratios and the new lists exist only with `--all`. A site is a unique `(file, token-or-value)` pair. A missing block for a variant component counts `unjustified`. component_api: the most common value set per shared prop is canonical, and synonyms are listed as advisory hints. New item names are `<Component>.<prop>` | existing findings already dedupe per `(file, value)` (`reuse-check.mjs:193-198`), so the sum invariant needs the same unit; in default mode `component_token_literals` would leak into the create loop's `unjustified`; `justify()` keys on `name` (`reuse-check.mjs:55`), so a bare `Button` would collide with `new_components` | per-occurrence counting (changes schema-2 arrays); synonyms counted in the ratio (a judgement call inside the number) |
+| ARCH-VERIFY-22 (supersedes 19) | `tokensUsed` is normalised to each token's bound variable; the declared token files are read as text; deprecation comes only from JSDoc or an exact `Deprecate <Name>` row | `inventory.mjs:311` reads only ts/js/json, so it never sees `--spacing`; the prose scan misfires (`inventory.mjs:90`) | executing config; keeping the prose scan |
+| ARCH-VERIFY-23 (supersedes 20) | the input manifest (paths + sha256 + renderer version) makes `--check` reproducible whichever mode wrote the file; `supersedes` is rendered as text | a bare hash can't tell init-rendered from audit-rendered inputs; an anchor would be an href derived from data | timestamp; in-page anchors |
+| ARCH-VERIFY-24 | `design-md.mjs` owns `formatOf` and table parsing (re-exported from inventory); it and token-refs are pure; design-doc never imports reuse-check | reuse-check imports inventory and git plumbing (`reuse-check.mjs:7`); one parser fixes the fixture-vs-template Themes mismatch (`scripts/fixtures/reuse/DESIGN.md:24-28` vs `design-template.md:36`) | parsing inside each script; design-doc importing reuse-check |
+| ARCH-VERIFY-25 | binding is the `variable` cell or the convention `space.4` → `--space-4`; category comes from value shape; `--spacing` is read statically (default 0.25rem) | matches what already holds (`color.action.primary` ↔ `--color-action-primary`); numeric utilities are `calc(var(--spacing) * n)` (tailwindcss.com/docs/padding) | a required column; a `category` column; a `spacing base` Platform-notes line |
+| ARCH-VERIFY-26 | the class tokenizer tracks bracket depth and handles `!`, `-`, `/opacity`, `x-(--v)` and `x-[…]`; unknown or ambiguous classes are advisory | variants can contain `:` (tailwindcss.com/docs/hover-focus-and-other-states), so today's split on `:` (`reuse-check.mjs:77`) breaks them | splitting on `:`; preferring colour when `text-foo` is ambiguous |
+
+**Known limits:**
+- rem is fixed at 16px (`reuse-check.mjs:62`).
+- The component_api canonical set can shift when a new component changes the majority. That is deterministic for a given tree, but can move between audits.
