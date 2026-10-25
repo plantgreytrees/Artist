@@ -1,0 +1,9 @@
+{
+  "name": "artist",
+  "displayName": "Artist",
+  "version": "0.1.0",
+  "description": "Designs, builds, measures and refines web and mobile UI until it meets a scored quality bar.",
+  "author": { "name": "Kieran" },
+  "license": "MIT",
+  "keywords": ["ui", "design", "design-system", "accessibility", "web-vitals", "playwright"]
+}
