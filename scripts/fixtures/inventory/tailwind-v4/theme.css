@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #1d6b4f;
+  --color-surface: #ffffff;
+  --spacing: 0.25rem;
+}
