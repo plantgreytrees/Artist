@@ -338,3 +338,51 @@ test("design-doc never writes through a symlink that leaves the project", () => 
   assert.equal(run(d2).status, 2);
   assert.equal(readFileSync(victim, "utf8"), "keep");
 });
+
+// ---- scrutinise round 3 ----------------------------------------------------
+const NEUTRAL = /^design-doc: input (is not a regular file|resolves outside the project)/m;
+
+test("a docs symlink to an empty outside folder exits 2 and creates nothing there", () => {
+  const outside = mkdtempSync(join(tmpdir(), "dd-docs-"));
+  const dir = project("clean");
+  rmSync(join(dir, "docs"), { recursive: true });
+  symlinkSync(outside, join(dir, "docs"));
+  const r = run(dir);
+  assert.equal(r.status, 2, r.stderr);
+  assert.deepEqual(readdirSync(outside), []);
+});
+
+test("an escaping DESIGN.md symlink in write mode gives the mode-neutral message", () => {
+  const outside = mkdtempSync(join(tmpdir(), "dd-design-"));
+  const dir = project("clean");
+  cpSync(join(dir, "DESIGN.md"), join(outside, "DESIGN.md"));
+  rmSync(join(dir, "DESIGN.md"));
+  symlinkSync(join(outside, "DESIGN.md"), join(dir, "DESIGN.md"));
+  const r = run(dir);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, NEUTRAL);
+  assert.doesNotMatch(r.stderr, /manifest/);
+});
+
+test("an escaping reuse input under --check gives the mode-neutral message", () => {
+  const dir = project("clean");
+  assert.equal(run(dir).status, 0);
+  const outside = mkdtempSync(join(tmpdir(), "dd-link-"));
+  writeFileSync(join(outside, "reuse.json"), readFileSync(join(dir, "reuse.json")));
+  symlinkSync(outside, join(dir, "outlink"));
+  tamper(dir, (m) => m.inputs.push({ role: "reuse", path: "outlink/reuse.json", sha256: "0" }));
+  const r = run(dir, "--check");
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, NEUTRAL);
+  assert.doesNotMatch(r.stderr, /manifest/);
+});
+
+test("a FIFO at the output path exits 2 without hanging", () => {
+  const dir = project("clean");
+  const fifo = join(dir, ...OUT);
+  mkdirSync(dirname(fifo), { recursive: true });
+  if (spawnSync("mkfifo", [fifo]).status !== 0) return; // no mkfifo on this platform
+  const r = spawnSync("node", [SCRIPT, "--project", dir], { encoding: "utf8", timeout: 10000 });
+  assert.equal(r.signal, null, "design-doc hung on a FIFO");
+  assert.equal(r.status, 2, r.stderr);
+});

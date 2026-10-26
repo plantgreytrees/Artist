@@ -5,7 +5,18 @@
 // Imports design-md only; never the reuse audit module (ARCH-VERIFY-25).
 
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { formatOf, tokensOf, componentTokensOf, decisionsOf } from "./design-md.mjs";
 
@@ -235,15 +246,42 @@ function validateSpecs(project, specs) {
   if (!seen.has("design")) throw new UserError("manifest has no design input");
 }
 
-// lstat never follows a symlink, so a symlinked output reads as "not a regular file".
-const lstatOrNull = (p) => {
-  try {
-    return lstatSync(p);
-  } catch {
-    return null;
-  }
-};
 const within = (project, real) => real.startsWith(realpathSync(project) + sep);
+
+// Write only docs/design/design-system.html inside the project (ARCH-VERIFY-24). Each parent
+// is checked before anything is created under it, so a symlinked `docs` or `docs/design`
+// that leaves the project gets nothing; the file is opened O_NOFOLLOW, so a symlinked
+// output is refused at open time rather than after a separate check.
+function writeOutput(project, out, html) {
+  let dir = project;
+  for (const part of dirname(OUT_REL).split("/")) {
+    dir = join(dir, part);
+    if (!existsSync(dir)) {
+      try {
+        lstatSync(dir); // a dangling symlink: refuse rather than create through it
+        throw new UserError(`${relative(project, dir)} is a dangling link`);
+      } catch (e) {
+        if (e instanceof UserError) throw e;
+      }
+      mkdirSync(dir);
+    }
+    if (!within(project, realpathSync(dir))) throw new UserError(`${posix(relative(project, dir))} resolves outside the project`);
+  }
+  let fd;
+  try {
+    fd = openSync(out, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  } catch (e) {
+    // ELOOP: a symlink; ENXIO: a FIFO with no reader (O_NONBLOCK keeps it from hanging)
+    if (e.code === "ELOOP" || e.code === "ENXIO") throw new UserError(`${OUT_REL} is not a regular file`);
+    throw e;
+  }
+  try {
+    if (!lstatSync(out).isFile()) throw new UserError(`${OUT_REL} is not a regular file`);
+    writeFileSync(fd, html);
+  } finally {
+    closeSync(fd);
+  }
+}
 
 function readEntry(project, role, path) {
   const abs = resolve(project, path);
@@ -325,13 +363,7 @@ export function main(argv) {
 
   const specs = gather(project, reuse);
   const { html } = build(project, specs, { missingIsStale: false });
-  // Write only docs/design/design-system.html inside the project (ARCH-VERIFY-24): never
-  // through a symlinked directory that leaves it, never through a symlinked output file.
-  mkdirSync(dirname(out), { recursive: true });
-  if (!within(project, realpathSync(dirname(out)))) throw new UserError(`${dirname(OUT_REL)} resolves outside the project`);
-  const existing = lstatOrNull(out);
-  if (existing && !existing.isFile()) throw new UserError(`${OUT_REL} is not a regular file`);
-  writeFileSync(out, html);
+  writeOutput(project, out, html);
   return 0;
 }
 
