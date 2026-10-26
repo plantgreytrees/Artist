@@ -3,8 +3,8 @@ area: plugin
 governs: [".claude-plugin/**", ".mcp.json", "skills/**", "agents/**", "hooks/**", "commands/**", "evals/**", "README.md"]
 human: docs/architecture/plugin.md
 source: docs/ideas/artist-ui-plugin.md
-verified_at: 28fccd5c8761b0f5a0a9f7bbdc01d04e783913fb
-updated: 2026-10-25
+verified_at: a6f08ee9d1666a6b1450f55504b4fb81b76315e0
+updated: 2026-10-26
 ---
 # ARCH plugin — enforced rules
 

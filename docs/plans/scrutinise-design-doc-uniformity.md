@@ -125,6 +125,18 @@ Close the /scrutinise round 1 findings on design-doc-uniformity (main at 1c5a5eb
 - Round 1 (isolated scrutineer, ranges ebc68cc, 691a55f, 6435189, 5dba627, 92d0650, d50633f, 1d268e4, 1c5a5eb): Warnings in design-doc.mjs (inventory props, `--check` after audit, manifest path trust) and reuse-check.mjs (own DESIGN.md parser, ARCH-VERIFY-25). Suggestions grouped into the same units.
 - Round 3 (isolated scrutineer, ranges e4e666b, 6b8551c on 6b8551c; the first dispatch stalled on a blocked tool call and was stopped, the retry completed): 0 Critical, 2 Warning, 4 Suggestion; 2 criteria UNMET (untested clauses) and unticked; none disputed. New: reuse-check reads justifications against the cwd; design-doc's mkdir precedes its containment check.
 - Round 2 (isolated scrutineer, ranges 1a6d1ae, 192cf50, a41a4b0 on a41a4b0): 0 Critical, 2 Warning, 5 Suggestion; 29/29 criteria MET; none disputed. Round 1 findings closed. New: reuse-check `--run` resolves against cwd while design-doc `--reuse` resolves against `--project` (introduced by 1.2); `lstat` rejects in-project symlinked inputs in write mode.
+- Round 4 (isolated scrutineer, ranges 9dc3272, a6f08ee on a6f08ee): 0 Critical, 0 Warning, 0 Architecture, 6 Suggestion; criteria 40–43 MET, 0 UNMET; none disputed. Loop exit met; no units, rows or criteria added. Suggestions kept as follow-up candidates, not driven (no scope widening):
+  - S4.1 design-doc.mjs:274-276: EISDIR at the output path surfaces a raw Node error (exit 2 kept). Map it to "is not a regular file" and add a test.
+  - S4.2 design-doc.mjs:279: the type is re-checked by path after open. Use `fstatSync(fd)`.
+  - S4.3 design-doc.mjs:262/268: `docs`→`.` is refused with "resolves outside the project". It fails closed, but the wording is wrong; :262 also lacks `posix()`.
+  - S4.4 reuse-check.mjs:428,437: an explicit `--justifications`/`--design` stays cwd-relative, while `--run` is project-relative. No skill passes either flag.
+  - S4.5 inventory.mjs:717: a declared token file missing from `listProjectFiles` (e.g. git-ignored) is no longer read. This matches reuse-check, but no test pins it.
+  - S4.6 design-doc.test.mjs:345-353: the docs-symlink test does not assert the message.
+  - Residual risk:
+    - a parent-dir TOCTOU between realpath and open (Node has no `openat`);
+    - a hard-linked output;
+    - the FIFO test skips without `mkfifo`;
+    - Windows is untested.
 
 ## Step 1 — design-doc-hardening (., javascript, high)
 Tooling: implementer · gate security-auditor · TDD
