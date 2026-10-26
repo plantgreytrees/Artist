@@ -20,19 +20,6 @@
 | [artist-ui-plugin](./artist-ui-plugin.md) | skills-v2 | skills + README + evals | COMPLETE | all 1 acceptance criteria ticked; merged 43fa780 (commit f574a4c); validate --s… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | verify-impl | scripts/verify.mjs | COMPLETE | all 3 acceptance criteria ticked; merged fc71955 (commit 11cfec5); verify tests… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | verify-tests | scripts (tests first) | COMPLETE | all 2 acceptance criteria ticked; merged fc71955 (red commit 3cec547: ERR_MODUL… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | design-doc | scripts/design-doc.mjs | COMPLETE | all 3 acceptance criteria ticked; merged 691a55f (commit 35c03f1); root reviewe… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | design-md | scripts/design-md.mjs | COMPLETE | all 2 acceptance criteria ticked; merged ebc68cc (commit 9668e5b); root verifie… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | docs-release | README + CHANGELOG | COMPLETE | all 3 acceptance criteria ticked; 1c5a5eb on origin/main; suite 161/161 | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | evals-docs | evals/design-system + README | CANCELLED | duplicate plan registered by session 691b9c18 in error; superseded by the 8-uni… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | integration | whole plugin | CANCELLED | duplicate plan registered by session 691b9c18 in error; superseded by the 8-uni… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | inventory-tokens | scripts/inventory.mjs tokens | COMPLETE | all 2 acceptance criteria ticked; merged 2a07adc; node --test scripts/inventory… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | reuse-component | scripts/reuse-check.mjs component tiers | CANCELLED | duplicate plan registered by session 691b9c18 in error; superseded by the 8-uni… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | reuse-ratios | scripts/reuse-check.mjs schema 3 | COMPLETE | all 3 acceptance criteria ticked; merged d50633f (commit b5293e1), pushed; root… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | skill-create-optimise | skills/create + skills/optimise | CANCELLED | duplicate plan registered by session 691b9c18 in error; superseded by the 8-uni… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | skill-design-system | skills/design-system | CANCELLED | duplicate plan registered by session 691b9c18 in error; superseded by the 8-uni… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | skill-html | skills design-system + template + evals | COMPLETE | all 3 acceptance criteria ticked; merged 92d0650 (commit b8d2578), pushed in d5… | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | skills-ratios | skills audit + create/optimise | COMPLETE | all 2 acceptance criteria ticked; 1d268e4 on origin/main; suite 161/161 | 2026-10-25 |
-| [design-doc-uniformity](./design-doc-uniformity.md) | token-refs | scripts/token-refs.mjs | COMPLETE | all 2 acceptance criteria ticked; merged 6435189 (commit 72f0d02); root verifie… | 2026-10-25 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-reuse-check | scripts/reuse-check.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 2954531 (commit 3ed41b8); red 9 pass/5… | 2026-10-25 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-review-html | scripts/review-html.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 7bc6afc (commit 10569d2); root impleme… | 2026-10-25 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-verify | scripts/verify.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 90a4dd8 (commit 2bc9f56); red 4 failin… | 2026-10-25 |
