@@ -18,7 +18,7 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, posix, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatOf, bindTokens, decisionsOf, spacingBaseOf, tokenFilesOf, isTokenFile } from "./design-md.mjs";
+import { formatOf, bindTokens, decisionsOf, spacingBaseOf, tokenFilesOf, tokenFilePaths } from "./design-md.mjs";
 import { tokenRefsIn } from "./token-refs.mjs";
 
 export const START = "<!-- artist:inventory:start -->";
@@ -711,17 +711,10 @@ export function replaceMarked(md, section) {
 }
 
 // Declared `token files` (Platform notes) read as text, never executed; paths stay inside the
-// project. A `dir/` entry covers the listed files under it, as in reuse-check (ARCH-VERIFY-26).
+// project. Selected with tokenFilePaths, exactly as reuse-check selects them (ARCH-VERIFY-26).
 function tokenFileTexts(project, md) {
-  const declared = tokenFilesOf(md);
-  const rels = [
-    ...declared.filter((t) => !t.endsWith("/")),
-    ...(declared.some((t) => t.endsWith("/"))
-      ? listProjectFiles(project).filter((p) => isTokenFile(declared.filter((t) => t.endsWith("/")), p))
-      : []),
-  ];
   const texts = [];
-  for (const rel of rels) {
+  for (const rel of tokenFilePaths(tokenFilesOf(md), listProjectFiles(project))) {
     const abs = join(project, rel);
     const back = relative(project, abs);
     if (back.startsWith("..") || !existsSync(abs) || !isRegular(abs)) continue;

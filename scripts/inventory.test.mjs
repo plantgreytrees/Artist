@@ -546,6 +546,7 @@ test("inventory.mjs never dynamically imports or requires", () => {
 });
 
 test("a token files directory entry is read like reuse-check reads it (custom --spacing)", () => {
+  let lastDir;
   const tokensUsedWith = (entry) => {
     const dir = copy();
     mkdirSync(join(dir, "tailwind-v4/themes"), { recursive: true });
@@ -555,10 +556,21 @@ test("a token files directory entry is read like reuse-check reads it (custom --
     writeFileSync(join(dir, "DESIGN.md"), md + "\n<!-- artist:inventory:start -->\n<!-- artist:inventory:end -->\n");
     const r = run(dir);
     assert.equal(r.status, 0, r.stderr);
+    lastDir = dir;
     const inv = JSON.parse(readFileSync(join(dir, "docs/design/inventory.json"), "utf8"));
     return inv.components.find((c) => c.path === "tailwind-v4/src/Button.tsx").tokensUsed;
   };
   const viaDir = tokensUsedWith("tailwind-v4/themes/");
   assert.deepEqual(viaDir, tokensUsedWith("tailwind-v4/themes/theme.css"));
   assert.equal(viaDir.includes("--space-4"), false); // 8px base: px-4 = 32px, not space.4
+  // reuse-check --all on the same project reads the same base: px-4 is off-token there too
+  const out = mkdtempSync(join(tmpdir(), "inv-reuse-"));
+  const rc = spawnSync(
+    process.execPath,
+    [join(here, "reuse-check.mjs"), "--project", lastDir, "--run", out, "--all"],
+    { encoding: "utf8", timeout: 30000 },
+  );
+  assert.ok(rc.status === 0 || rc.status === 1, rc.stderr);
+  const reuse = JSON.parse(readFileSync(join(out, "reuse.json"), "utf8"));
+  assert.ok(reuse.off_token_classes.some((x) => x.class === "px-4"), "reuse-check resolved px-4 with a different base");
 });

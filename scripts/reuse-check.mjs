@@ -5,7 +5,16 @@ import { join, basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { buildInventory, capOf, formatOf, listProjectFiles } from "./inventory.mjs";
-import { bindTokens, spacingBaseOf, tokensOf, componentTokensOf, tableOf, tokenFilesOf, isTokenFile } from "./design-md.mjs";
+import {
+  bindTokens,
+  spacingBaseOf,
+  tokensOf,
+  componentTokensOf,
+  tableOf,
+  tokenFilesOf,
+  isTokenFile,
+  tokenFilePaths,
+} from "./design-md.mjs";
 import { resolveClass, tokenRefsIn, classesIn } from "./token-refs.mjs";
 
 const hexOf = (n) =>
@@ -168,9 +177,8 @@ export function checkReuse({ designMd, files, justifications = {}, all = false, 
     res.near_duplicates = [];
   }
   const seenComp = new Set();
-  const tokenTexts = all
-    ? files.filter((f) => isTokenFile(tokFiles, f.path.replace(/\\/g, "/"))).map((f) => f.content)
-    : [];
+  const byPath = new Map(files.map((f) => [f.path.replace(/\\/g, "/"), f.content]));
+  const tokenTexts = all ? tokenFilePaths(tokFiles, [...byPath.keys()]).map((p) => byPath.get(p)) : [];
   const tctx = { tokens: all ? bindTokens(designMd) : [], spacingPx: spacingBaseOf(tokenTexts) };
   const varCat = new Map(tctx.tokens.map((t) => [t.variable, t.category]));
   // A Component tokens variable aliasing a token counts in that token's category (ARCH-PLUGIN-35).
@@ -423,7 +431,10 @@ function main() {
   if (!designPath) throw new Error("DESIGN.md not found");
   const designMd = readFileSync(designPath, "utf8");
   if (formatOf(designMd) !== 2) throw new Error(`${designPath} is not format 2; rerun design-system init`);
-  const jPath = a.justifications || join(a.run, "justifications.json");
+  // A relative --run is relative to --project, as design-doc's --reuse is (ARCH-PLUGIN-36);
+  // the default justifications.json is read from the same folder reuse.json is written to.
+  const runDir = resolve(a.project, a.run);
+  const jPath = a.justifications || join(runDir, "justifications.json");
   let justifications = {};
   if (existsSync(jPath)) {
     try {
@@ -468,8 +479,6 @@ function main() {
     }
   }
   const result = checkReuse({ designMd, files, justifications, all: !!a.all, inventory });
-  // A relative --run is relative to --project, as design-doc's --reuse is (ARCH-PLUGIN-36).
-  const runDir = resolve(a.project, a.run);
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(runDir, "reuse.json"), JSON.stringify(result, null, 2) + "\n");
   return result.unjustified ? 1 : 0;

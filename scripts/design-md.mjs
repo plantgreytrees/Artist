@@ -192,6 +192,11 @@ export function tokenFilesOf(md) {
 // True when a project-relative path is a declared token file or sits under a declared `dir/`.
 export const isTokenFile = (list, p) => list.some((t) => (t.endsWith("/") ? p.startsWith(t) : p === t));
 
+// The project files that are token files, in sorted order: the one selection both inventory and
+// reuse-check read their token texts from, so both see the same `--spacing` (ARCH-VERIFY-26).
+export const tokenFilePaths = (declared, projectFiles) =>
+  projectFiles.filter((p) => isTokenFile(declared, p)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
 // Tailwind v4 `--spacing` base in px, read from token-file text (default 0.25rem, 1rem = 16px).
 export function spacingBaseOf(texts) {
   for (const text of Array.isArray(texts) ? texts : [texts]) {

@@ -15,6 +15,7 @@ import {
   categoryOf,
   spacingBaseOf,
   isTokenFile,
+  tokenFilePaths,
   tokenFilesOf,
 } from "./design-md.mjs";
 
@@ -171,4 +172,10 @@ test("isTokenFile matches exact files and trailing-slash directories", () => {
   assert.equal(isTokenFile(["a.css", "src/themes/"], "a.css"), true);
   assert.equal(isTokenFile(["a.css", "src/themes/"], "src/themes/x.css"), true);
   assert.equal(isTokenFile(["a.css", "src/themes/"], "src/themesx.css"), false);
+});
+
+test("tokenFilePaths picks declared files and files under declared dirs, sorted", () => {
+  const files = ["z.css", "src/themes/b.css", "src/themes/a.css", "src/x.css", "other/z.css"];
+  assert.deepEqual(tokenFilePaths(["z.css", "src/themes/"], files), ["src/themes/a.css", "src/themes/b.css", "z.css"]);
+  assert.deepEqual(tokenFilePaths([], files), []);
 });
