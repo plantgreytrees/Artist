@@ -776,3 +776,27 @@ test("CLI resolves a relative --run against --project, whatever the cwd", () => 
   assert.ok(existsSync(join(p, ".artist/audit/reuse.json")));
   assert.equal(existsSync(join(elsewhere, ".artist")), false);
 });
+
+test("CLI reads the default justifications.json from the --run folder under --project, whatever the cwd", () => {
+  const p = mkdtempSync(join(tmpdir(), "reuse-proj-"));
+  spawnSync("cp", ["-r", fx + "/.", p]);
+  mkdirSync(join(p, ".artist/audit"), { recursive: true });
+  const allJust = {
+    ...justifications,
+    "src/app/pricing/layout.tsx": "x",
+    "#7b5cff": "x",
+    "#ff0000": "x",
+    "#1d6b4f": "x",
+    "13px": "x",
+    recharts: "x",
+  };
+  writeFileSync(join(p, ".artist/audit/justifications.json"), JSON.stringify(allJust));
+  const elsewhere = mkdtempSync(join(tmpdir(), "reuse-cwd-"));
+  const res = spawnSync(
+    process.execPath,
+    [join(here, "reuse-check.mjs"), "--project", p, "--run", ".artist/audit", "--files", changed.join(",")],
+    { encoding: "utf8", cwd: elsewhere },
+  );
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(JSON.parse(readFileSync(join(p, ".artist/audit/reuse.json"), "utf8")).unjustified, 0);
+});
