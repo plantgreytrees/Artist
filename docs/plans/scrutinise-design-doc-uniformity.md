@@ -7,7 +7,7 @@ children: []
 priority: P1
 idea: docs/ideas/design-doc-uniformity.md
 classification: in-scope (fixes to merged design-doc-uniformity units; no decided rule changes)
-tracker_rows: [scrutinise-design-doc-uniformity#design-doc-hardening, scrutinise-design-doc-uniformity#reuse-check-design-md, scrutinise-design-doc-uniformity#review-html-literals, scrutinise-design-doc-uniformity#design-doc-confine, scrutinise-design-doc-uniformity#audit-paths-shared]
+tracker_rows: [scrutinise-design-doc-uniformity#design-doc-hardening, scrutinise-design-doc-uniformity#reuse-check-design-md, scrutinise-design-doc-uniformity#review-html-literals, scrutinise-design-doc-uniformity#design-doc-confine, scrutinise-design-doc-uniformity#audit-paths-shared, scrutinise-design-doc-uniformity#design-doc-mkdir, scrutinise-design-doc-uniformity#token-file-paths]
 guards:
   blast_radius: done
   completeness_sweep: done
@@ -88,6 +88,32 @@ units:
       write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/design-md.mjs, scripts/design-md.test.mjs, scripts/token-refs.mjs, scripts/token-refs.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
     arch: [ARCH-PLUGIN-36, ARCH-VERIFY-22, ARCH-VERIFY-23, ARCH-VERIFY-25, ARCH-VERIFY-26]
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
+  - id: 6
+    scope_id: design-doc-mkdir
+    project: "."
+    depends_on: []
+    module: scripts/design-doc.mjs
+    language: javascript (node ESM)
+    security: high
+    scope:
+      read: [scripts/design-doc.mjs, scripts/design-doc.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/design-doc.mjs, scripts/design-doc.test.mjs]
+    arch: [ARCH-VERIFY-24, ARCH-PLUGIN-37]
+    tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
+  - id: 7
+    scope_id: token-file-paths
+    project: "."
+    depends_on: []
+    module: scripts/reuse-check.mjs + design-md/inventory
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/design-md.mjs, scripts/design-md.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
+      docs: [docs/architecture/verify.rules.md, docs/architecture/plugin.rules.md]
+      write: [scripts/reuse-check.mjs, scripts/reuse-check.test.mjs, scripts/design-md.mjs, scripts/design-md.test.mjs, scripts/inventory.mjs, scripts/inventory.test.mjs]
+    arch: [ARCH-PLUGIN-36, ARCH-VERIFY-25, ARCH-VERIFY-26, ARCH-VERIFY-23]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [], mcp: [] }
 ---
 
 # Plan: scrutinise-design-doc-uniformity — round 1 fixes
@@ -97,6 +123,7 @@ Close the /scrutinise round 1 findings on design-doc-uniformity (main at 1c5a5eb
 
 ## Rolling summary
 - Round 1 (isolated scrutineer, ranges ebc68cc, 691a55f, 6435189, 5dba627, 92d0650, d50633f, 1d268e4, 1c5a5eb): Warnings in design-doc.mjs (inventory props, `--check` after audit, manifest path trust) and reuse-check.mjs (own DESIGN.md parser, ARCH-VERIFY-25). Suggestions grouped into the same units.
+- Round 3 (isolated scrutineer, ranges e4e666b, 6b8551c on 6b8551c; the first dispatch stalled on a blocked tool call and was stopped, the retry completed): 0 Critical, 2 Warning, 4 Suggestion; 2 criteria UNMET (untested clauses) and unticked; none disputed. New: reuse-check reads justifications against the cwd; design-doc's mkdir precedes its containment check.
 - Round 2 (isolated scrutineer, ranges 1a6d1ae, 192cf50, a41a4b0 on a41a4b0): 0 Critical, 2 Warning, 5 Suggestion; 29/29 criteria MET; none disputed. Round 1 findings closed. New: reuse-check `--run` resolves against cwd while design-doc `--reuse` resolves against `--project` (introduced by 1.2); `lstat` rejects in-project symlinked inputs in write mode.
 
 ## Step 1 — design-doc-hardening (., javascript, high)
@@ -131,6 +158,18 @@ Tooling: implementer · TDD
 - [ ] 5.2 [Suggestion] `scripts/design-md.mjs:79` lowercase (trim) table header keys in `parseTables`, so `| Name | Value |` tables read like the template → accept: design-md test with capitalised headers; reuse-check reads a capitalised Spacing table
 - [ ] 5.3 [Suggestion][Security] `scripts/token-refs.mjs:105` replace the exported global `/g` `STRING_LIT` with a shared `classesIn(content)` generator (yields `{cls, index}` with the length guard) used by `tokenRefsIn` and reuse-check's `off_token_classes` loop (`:258-267`) → accept: no exported RegExp; token-refs test for `classesIn`; reuse-check tests pass unchanged in intent
 - [ ] 5.4 [Suggestion][Cross-unit] expand `tokenFilesOf` directory entries the same way in inventory (`scripts/inventory.mjs:715-719`) as reuse-check does, so `--spacing` under a listed directory gives the same base in both (ARCH-VERIFY-26) → accept: inventory test with `token files: src/themes/` and a custom `--spacing` resolves `p-2` to the same token reuse-check counts
+
+## Step 6 — design-doc-mkdir (., javascript, high) — round 3
+Tooling: implementer · gate security-auditor · TDD
+- [ ] 6.1 [Warning][Security] `scripts/design-doc.mjs:330` `mkdirSync(dirname(out), {recursive:true})` runs before the containment check (`:331`), so a `docs` symlink to an outside folder gets `<outside>/design` created. Walk `docs` then `docs/design`: an existing part must realpath inside the project; create a missing part with a plain `mkdirSync`; only then write → accept: test with `docs` → empty outside folder exits 2 and the outside folder stays empty
+- [ ] 6.2 [Suggestion][Security] `:332-334` write through a descriptor opened with `O_WRONLY|O_CREAT|O_TRUNC|O_NOFOLLOW` (replaces the lstat check) → accept: a symlinked `design-system.html` still exits 2, target untouched
+- [ ] 6.3 [Suggestion][Test-coverage] assert the mode-neutral message (`/^design-doc: input (is not a regular file|resolves outside the project)/`, no `manifest`) for an escaping DESIGN.md symlink in write mode and the outlink case under `--check` → accept: reverting the message to "manifest input" fails a test
+
+## Step 7 — token-file-paths (., javascript, normal) — round 3
+Tooling: implementer · TDD
+- [ ] 7.1 [Warning][Correctness] `scripts/reuse-check.mjs:426` read the default `justifications.json` from the same `resolve(project, run)` folder `reuse.json` is written to (`:472`, ARCH-PLUGIN-36) → accept: CLI test from another cwd with justifications beside reuse.json exits 0
+- [ ] 7.2 [Suggestion][Cross-unit] one pure `tokenFilePaths(declared, projectFiles)` in design-md.mjs: `projectFiles.filter(p => isTokenFile(declared, p))`, sorted; inventory (`:717-722`) and reuse-check (`:171-173`) both pick their token texts through it (ARCH-VERIFY-26) → accept: design-md test; no other token-file expansion in scripts/
+- [ ] 7.3 [Suggestion][Test-coverage] the inventory directory-entry test (`scripts/inventory.test.mjs:548`) also runs `checkReuse({all:true})` on the same files and shows the same `--spacing` base → accept: the test fails if either tool reads a different base
 
 ## Sequencing
 All units are independent. Whole-plan: `node --test scripts/*.test.mjs` exits 0 on the merged result. No CHANGELOG task: the `[Unreleased]` design-depth bullet already covers this unreleased feature.
