@@ -20,17 +20,19 @@ const fail = (reason, detail) => {
 
 export const SCHOOLS = Object.freeze(
   [
-    ["minimalist"],
-    ["swiss"],
-    ["material"],
-    ["flat"],
-    ["neumorphism"],
-    ["glassmorphism", true],
-    ["brutalist"],
-    ["editorial"],
-    ["retro-futurist", true],
-    ["aurora", true],
-  ].map(([id, ambitious]) => Object.freeze(ambitious ? { id, ambitious: true } : { id })),
+    ["minimalist", false, ["inter"]],
+    ["swiss", false, ["inter-tight"]],
+    ["material", false, ["figtree"]],
+    ["flat", false, ["nunito"]],
+    ["neumorphism", false, ["nunito"]],
+    ["glassmorphism", true, ["plus-jakarta-sans"]],
+    ["brutalist", false, ["space-grotesk", "space-mono"]],
+    ["editorial", false, ["fraunces", "inter"]],
+    ["retro-futurist", true, ["orbitron", "jetbrains-mono"]],
+    ["aurora", true, ["sora"]],
+  ].map(([id, ambitious, fonts]) =>
+    Object.freeze({ id, ...(ambitious ? { ambitious: true } : {}), fonts: Object.freeze(fonts) }),
+  ),
 );
 const SCHOOL = new Map(SCHOOLS.map((s) => [s.id, s]));
 const AXES = ["palette", "type", "shape", "motion", "base"];

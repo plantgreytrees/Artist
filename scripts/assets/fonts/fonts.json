@@ -1,0 +1,280 @@
+{
+  "schema": 1,
+  "fonts": [
+    {
+      "family": "inter",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "inter/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/",
+      "files": [
+        {
+          "name": "inter-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/inter-latin-400-normal.woff2",
+          "sha256": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc"
+        },
+        {
+          "name": "inter-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.3.0/files/inter-latin-700-normal.woff2",
+          "sha256": "6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491"
+        }
+      ]
+    },
+    {
+      "family": "inter-tight",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "inter-tight/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter-tight@5.3.0/files/",
+      "files": [
+        {
+          "name": "inter-tight-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter-tight@5.3.0/files/inter-tight-latin-400-normal.woff2",
+          "sha256": "6f32da94d4f26e98cb6ccd97034d306aa38945322c816f54a93c7d15dc0905b8"
+        },
+        {
+          "name": "inter-tight-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/inter-tight@5.3.0/files/inter-tight-latin-700-normal.woff2",
+          "sha256": "9c4f02f38678f2628292d66c4f7a1a6a06af7ffac4d279359b09074e7d0f1fe0"
+        }
+      ]
+    },
+    {
+      "family": "figtree",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "figtree/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/figtree@5.3.0/files/",
+      "files": [
+        {
+          "name": "figtree-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/figtree@5.3.0/files/figtree-latin-400-normal.woff2",
+          "sha256": "8f98dd642986f1fa39c45b89665a57372897c235b36028e0e4a136e43dc5f8ab"
+        },
+        {
+          "name": "figtree-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/figtree@5.3.0/files/figtree-latin-700-normal.woff2",
+          "sha256": "7ec4f08d09f91d349917dd6592f6aaae66d8fe1bbd58fa24707961e79236616e"
+        }
+      ]
+    },
+    {
+      "family": "nunito",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "nunito/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/nunito@5.3.0/files/",
+      "files": [
+        {
+          "name": "nunito-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/nunito@5.3.0/files/nunito-latin-400-normal.woff2",
+          "sha256": "a5906e15ceb68f73d3b2c2076b4057c3f6ed401186d56283b45ce12944ca0735"
+        },
+        {
+          "name": "nunito-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/nunito@5.3.0/files/nunito-latin-700-normal.woff2",
+          "sha256": "fa89300b9bbb3bd0f60d6991aa055965d98e2ccca27bf8688fe0c39cdc796846"
+        }
+      ]
+    },
+    {
+      "family": "plus-jakarta-sans",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "plus-jakarta-sans/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.3.0/files/",
+      "files": [
+        {
+          "name": "plus-jakarta-sans-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.3.0/files/plus-jakarta-sans-latin-400-normal.woff2",
+          "sha256": "221a4135d06a4b33abbd535e9a0da4e565d19545ddd9267c4e678a916d54d9b6"
+        },
+        {
+          "name": "plus-jakarta-sans-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/plus-jakarta-sans@5.3.0/files/plus-jakarta-sans-latin-700-normal.woff2",
+          "sha256": "2050755bf475817c96ac7d914c7f07cc3c2d11ff4b3fb4747b8d41de584aad17"
+        }
+      ]
+    },
+    {
+      "family": "space-grotesk",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "space-grotesk/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk@5.3.0/files/",
+      "files": [
+        {
+          "name": "space-grotesk-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk@5.3.0/files/space-grotesk-latin-400-normal.woff2",
+          "sha256": "65fd17fcbd2e2f522940b5f67ead3d23329e02891aa5495e74d11a499c0b0673"
+        },
+        {
+          "name": "space-grotesk-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-grotesk@5.3.0/files/space-grotesk-latin-700-normal.woff2",
+          "sha256": "35f8aec56cfd5cbfdb03cc68733a54a0b05bb3617ffcd5fd332badc0b045ca55"
+        }
+      ]
+    },
+    {
+      "family": "space-mono",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "space-mono/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-mono@5.3.0/files/",
+      "files": [
+        {
+          "name": "space-mono-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-mono@5.3.0/files/space-mono-latin-400-normal.woff2",
+          "sha256": "fb4a81a2d0a893e5c38c394a7e716a1cef0b24610a0af49c96f6d529bd66bf2b"
+        },
+        {
+          "name": "space-mono-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/space-mono@5.3.0/files/space-mono-latin-700-normal.woff2",
+          "sha256": "2d46bd159b53f55c41167a4f1540a074649464194fd1e416f5b4694a6c0f282c"
+        }
+      ]
+    },
+    {
+      "family": "fraunces",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "fraunces/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/fraunces@5.3.0/files/",
+      "files": [
+        {
+          "name": "fraunces-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/fraunces@5.3.0/files/fraunces-latin-400-normal.woff2",
+          "sha256": "e558f39453a9c611908be04294b50dea5f21ae6c49b41c6e47f4115e91f90209"
+        },
+        {
+          "name": "fraunces-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/fraunces@5.3.0/files/fraunces-latin-700-normal.woff2",
+          "sha256": "c38570d224b830056e69484bb9e768e1d3fa7ba4755c8891a3c6d366194d2ff3"
+        }
+      ]
+    },
+    {
+      "family": "orbitron",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "orbitron/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/orbitron@5.3.0/files/",
+      "files": [
+        {
+          "name": "orbitron-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/orbitron@5.3.0/files/orbitron-latin-400-normal.woff2",
+          "sha256": "9320ca80be2f4275e7aaa009bc058b9ea46264d4f92b06f0b822c3405cf45841"
+        },
+        {
+          "name": "orbitron-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/orbitron@5.3.0/files/orbitron-latin-700-normal.woff2",
+          "sha256": "ee6acc5ad5349018f9ca71fab8118144160e110838931874150a1ac3f97db38d"
+        }
+      ]
+    },
+    {
+      "family": "jetbrains-mono",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "jetbrains-mono/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.3.0/files/",
+      "files": [
+        {
+          "name": "jetbrains-mono-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.3.0/files/jetbrains-mono-latin-400-normal.woff2",
+          "sha256": "14425ba9c695763c1547f48a206b7aa60350a33ae23de09f0407877f3fcd89eb"
+        },
+        {
+          "name": "jetbrains-mono-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.3.0/files/jetbrains-mono-latin-700-normal.woff2",
+          "sha256": "d0d4e818808f2a0ba39b2b09d1989366f63494e295f003c7ef436697378507e8"
+        }
+      ]
+    },
+    {
+      "family": "sora",
+      "weights": [
+        400,
+        700
+      ],
+      "version": "5.3.0",
+      "licence": "OFL-1.1",
+      "licenceFile": "sora/LICENSE",
+      "source": "https://cdn.jsdelivr.net/npm/@fontsource/sora@5.3.0/files/",
+      "files": [
+        {
+          "name": "sora-latin-400-normal.woff2",
+          "weight": 400,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/sora@5.3.0/files/sora-latin-400-normal.woff2",
+          "sha256": "98141d7eaa6e9ee35e0827d279018cd33c3e59c6650541ec7de1c692efd93942"
+        },
+        {
+          "name": "sora-latin-700-normal.woff2",
+          "weight": 700,
+          "source": "https://cdn.jsdelivr.net/npm/@fontsource/sora@5.3.0/files/sora-latin-700-normal.woff2",
+          "sha256": "c3337a673c9bbbfe433091d3831714dd9a257951f16f41eb3fc650ec593cfac2"
+        }
+      ]
+    }
+  ]
+}
