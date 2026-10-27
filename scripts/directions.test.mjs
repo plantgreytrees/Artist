@@ -250,7 +250,7 @@ test("resolvePick writes pick.json schema 1 with tokenDiff in the rounds.json sh
   const byName = Object.fromEntries(p.tokenDiff.changed.map((c) => [c.name, c]));
   assert.deepEqual(byName["color.accent"], { name: "color.accent", from: "#1d4ed8", to: "#ff3b00" });
   assert.deepEqual(byName["color.accent@dark"], { name: "color.accent@dark", from: "#93b4ff", to: "#ff6a3d" });
-  assert.deepEqual(byName["heading"], { name: "heading", from: "1.5rem", to: "Georgia, serif" });
+  assert.deepEqual(byName["heading"], { name: "heading", from: "1.5rem", to: "fraunces, serif" });
   assert.deepEqual(byName["dur.fast"], { name: "dur.fast", from: "150ms", to: "300ms" });
   assert.deepEqual(byName["space.4"], { name: "space.4", from: "16px", to: "20px" });
   assert.equal(byName["radius.md"], undefined, "shape=current changes nothing");
@@ -413,4 +413,213 @@ test("every school has at most two families and all exist in the manifest", () =
     assert.ok(Array.isArray(s.fonts) && s.fonts.length >= 1 && s.fonts.length <= 2, s.id);
     for (const fam of s.fonts) assert.ok(known.has(fam), `${s.id}: ${fam}`);
   }
+});
+
+// ---- renderer (ARCH-DIRECTIONS-06/07/08/12) ----
+
+const TS = "20260101T000000Z";
+const CSP_META =
+  `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:">`;
+
+function mkProject({ inventory = false, pkg = null, files = {} } = {}) {
+  const proj = mkdtempSync(join(tmpdir(), "dirr-"));
+  mkdirSync(join(proj, "docs", "design"), { recursive: true });
+  writeFileSync(join(proj, "docs", "design", "DESIGN.md"), md);
+  if (inventory) writeFileSync(join(proj, "docs", "design", "inventory.json"), readFileSync(join(fx, "inventory.json")));
+  if (pkg) writeFileSync(join(proj, "package.json"), JSON.stringify(pkg));
+  for (const [rel, body] of Object.entries(files)) {
+    mkdirSync(dirname(join(proj, rel)), { recursive: true });
+    writeFileSync(join(proj, rel), body);
+  }
+  return proj;
+}
+const render = (dj, proj, extra = []) =>
+  spawnSync(process.execPath, [join(here, "directions.mjs"), "--directions", dj, "--project", proj, "--timestamp", TS, ...extra]);
+const runDir = (proj) => join(proj, ".artist", "directions", TS);
+const page = (proj) => readFileSync(join(runDir(proj), "directions.html"), "utf8");
+const DJ = join(fx, "directions.json");
+const tmpJson = (obj) => {
+  const f = join(mkdtempSync(join(tmpdir(), "dirj-")), "d.json");
+  writeFileSync(f, JSON.stringify(obj));
+  return f;
+};
+const scriptsOf = (html) => [...html.matchAll(/<script(?![^>]*type=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+
+test("render writes only directions.html and fonts/ under the UTC-timestamped run dir", () => {
+  const proj = mkProject();
+  const r = render(DJ, proj);
+  assert.equal(r.status, 0, r.stderr.toString());
+  assert.deepEqual(readdirSync(join(proj, ".artist", "directions")), [TS]);
+  assert.deepEqual(readdirSync(runDir(proj)).sort(), ["directions.html", "fonts"]);
+  assert.deepEqual(readdirSync(proj).sort(), [".artist", "docs"]);
+});
+
+test("two runs with the same inputs are byte-identical", () => {
+  const proj = mkProject();
+  const snap = () => {
+    const walk = (d) =>
+      readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+    return walk(runDir(proj)).sort().map((f) => [f, createHash("sha256").update(readFileSync(f)).digest("hex")]);
+  };
+  assert.equal(render(DJ, proj).status, 0);
+  const a = snap();
+  assert.equal(render(DJ, proj).status, 0);
+  assert.deepEqual(snap(), a);
+  assert.ok(a.length > 1);
+});
+
+test("the page has Current and every direction on the fixed sample screen", () => {
+  const proj = mkProject();
+  render(DJ, proj);
+  const html = page(proj);
+  for (const id of ["current", "swiss-grid", "bold-block", "paper", "northern-lights"])
+    assert.match(html, new RegExp(`class="card"[^>]*data-card="${id}"`), id);
+  for (const c of ["nav", "card-sample", "list", "badge-sample", "btn-primary", "btn-secondary", "signin-form"])
+    assert.match(html, new RegExp(`class="[^"]*\\b${c}\\b`), c);
+  assert.equal((html.match(/data-v="swiss-grid"/g) ?? []).length >= 2, true);
+});
+
+test("every view is present: final grid and one-at-a-time, specimen, pick and mix", () => {
+  const proj = mkProject();
+  render(DJ, proj);
+  const html = page(proj);
+  for (const s of [
+    'id="view-final"', 'data-layout="grid"', 'data-layout-btn="grid"', 'data-layout-btn="one"',
+    'id="view-specimen"', 'id="view-mix"', 'data-view-btn="final"', 'data-view-btn="specimen"', 'data-view-btn="mix"',
+    'data-axis="base"', 'data-axis="palette"', 'data-axis="type"', 'data-axis="shape"', 'data-axis="motion"',
+    'data-v="mix"', 'data-mode-btn="dark"', 'data-mode-btn="light"', 'id="toggle-rm"', 'id="toggle-rt"',
+    'id="mix-diff"', 'id="mix-impact"', 'id="mix-contrast"', 'id="pickline"', "artist-pick v1",
+  ])
+    assert.ok(html.includes(s), s);
+  assert.match(html, /class="cell diff"/);
+  assert.match(html, /class="swatch"/);
+  assert.match(html, /class="ramp"/);
+  assert.match(html, /class="motion-dot"/);
+});
+
+test("CSP meta is exact, no external URLs, fonts only under fonts/", () => {
+  const proj = mkProject();
+  render(DJ, proj);
+  const html = page(proj);
+  assert.ok(html.includes(CSP_META));
+  assert.doesNotMatch(html, /https?:/i);
+  assert.doesNotMatch(html, /(?:src|href)\s*=\s*["']?(?:https?:|\/\/)/i);
+  const urls = [...html.matchAll(/url\(([^)]*)\)/g)].map((m) => m[1].replace(/["']/g, ""));
+  assert.ok(urls.length > 0);
+  for (const u of urls) assert.match(u, /^fonts\/[a-z0-9._\/-]+\.woff2$/, u);
+});
+
+test("only the fonts a run uses are copied", () => {
+  const proj = mkProject();
+  render(DJ, proj);
+  assert.deepEqual(
+    readdirSync(join(runDir(proj), "fonts")).sort(),
+    ["fraunces", "inter", "inter-tight", "sora", "space-grotesk", "space-mono"],
+  );
+  assert.ok(existsSync(join(runDir(proj), "fonts", "sora", "sora-latin-400-normal.woff2")));
+});
+
+test("a <script> in a brief, concept or evidence renders escaped", () => {
+  const d = valid();
+  d.directions[0].brief = "<script>alert(1)</script>";
+  d.current.concept = '<img src=x onerror=alert(2)>';
+  d.current.evidence = ['"><script>alert(3)</script>'];
+  const proj = mkProject();
+  const r = render(tmpJson(d), proj);
+  assert.equal(r.status, 0, r.stderr.toString());
+  const html = page(proj);
+  assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+  assert.ok(html.includes("&lt;img src=x onerror=alert(2)&gt;"));
+  assert.doesNotMatch(html, /<script>alert|<img src=x/);
+  assert.equal(scriptsOf(html).length, 1);
+});
+
+test("inline script only switches precomputed values: no eval, Function or innerHTML", () => {
+  const proj = mkProject();
+  render(DJ, proj);
+  const [js] = scriptsOf(page(proj));
+  assert.ok(js.length > 500);
+  assert.doesNotMatch(js, /\beval\b|\bFunction\b|innerHTML|outerHTML|insertAdjacentHTML|document\.write|setTimeout\(\s*["']/);
+});
+
+test("no input path accepts HTML: renderer ignores markup keys and fails unknown ones", () => {
+  const d = valid();
+  d.directions[0].markup = "<b>x</b>";
+  const r = render(tmpJson(d), mkProject());
+  assert.equal(r.status, 2);
+});
+
+test("the 3:1 fixture renders a visible contrast badge per direction and in the mix, exit 0", () => {
+  const proj = mkProject();
+  const r = render(join(fx, "low-contrast.json"), proj);
+  assert.equal(r.status, 0, r.stderr.toString());
+  const html = page(proj);
+  assert.match(html, /<span class="badge warn"[^>]*>[^<]*text on background[^<]*\(light\)[^<]*3\.03:1/);
+  const data = JSON.parse(html.match(/<script type="application\/json" id="directions-data">([\s\S]*?)<\/script>/)[1]);
+  assert.ok(data.contrast["swiss-grid"].some((w) => w.pair === "text on background" && w.ratio === 3.03));
+  assert.deepEqual(data.contrast.current, []);
+  assert.match(html, /id="mix-contrast"/);
+});
+
+test("invalid input exits 2 and writes nothing", () => {
+  const proj = mkProject();
+  for (const f of ["unknown-school.json", "css-url.json", "css-semicolon.json", "missing-dark.json"]) {
+    const r = render(join(fx, "invalid", f), proj);
+    assert.equal(r.status, 2, f);
+  }
+  assert.equal(existsSync(join(proj, ".artist")), false);
+  const d = valid();
+  d.directions[2].type.body = "Comic Sans, serif";
+  assert.equal(render(tmpJson(d), proj).status, 2);
+  const noMd = mkdtempSync(join(tmpdir(), "dirn-"));
+  assert.equal(render(DJ, noMd).status, 2);
+  assert.equal(spawnSync(process.execPath, [join(here, "directions.mjs"), "--directions", DJ]).status, 2);
+});
+
+test("the impact list joins the inventory, says so when it is absent, and reuse.json drives won't-carry", () => {
+  const withInv = mkProject({ inventory: true });
+  render(DJ, withInv, ["--reuse", join(fx, "reuse-all.json")]);
+  let html = page(withInv);
+  const data = JSON.parse(html.match(/id="directions-data">([\s\S]*?)<\/script>/)[1]);
+  assert.ok(data.axes.palette["bold-block"].impact.some((i) => i.token === "color.accent" && i.components.some((c) => c.name === "Button")));
+  assert.ok(data.axes.palette["bold-block"].wont.some((w) => w.value === "#123456"));
+  const bare = mkProject();
+  render(DJ, bare);
+  html = page(bare);
+  assert.match(html, /design-system init/);
+  assert.match(html, /design-system audit/);
+});
+
+test("React Native projects are labelled as a web approximation", () => {
+  const rn = mkProject({ pkg: { dependencies: { "react-native": "0.76.0" } } });
+  render(DJ, rn);
+  assert.match(page(rn), /web approximation/i);
+  const web = mkProject({ pkg: { dependencies: { react: "19.0.0" } } });
+  render(DJ, web);
+  assert.doesNotMatch(page(web), /web approximation/i);
+});
+
+test("the project's font loads by relative path when found via token files, else a labelled fallback", () => {
+  const css = '@font-face { font-family: "Acme Sans"; src: url("../assets/acme.woff2") format("woff2"); }\n';
+  const has = mkProject({ files: { "src/tokens.css": css, "assets/acme.woff2": "WOFF2DATA" } });
+  assert.equal(render(DJ, has).status, 0);
+  assert.ok(existsSync(join(runDir(has), "fonts", "current", "acme.woff2")));
+  assert.match(page(has), /url\(fonts\/current\/acme\.woff2\)/);
+  const none = mkProject({ files: { "src/tokens.css": css } });
+  render(DJ, none);
+  assert.doesNotMatch(page(none), /fonts\/current/);
+  assert.match(page(none), /Acme Sans[^<]*fallback stack/);
+  const escape = mkProject({ files: { "src/tokens.css": css.replace("../assets/acme", "../../../etc/acme"), "assets/acme.woff2": "x" } });
+  render(DJ, escape);
+  assert.doesNotMatch(page(escape), /fonts\/current/);
+});
+
+test("CLI --resolve after render writes pick.json into the render's run dir", () => {
+  const proj = mkProject();
+  assert.equal(render(DJ, proj).status, 0);
+  const ok = spawnSync(process.execPath, [join(here, "directions.mjs"), "--resolve", LINE, "--directions", DJ, "--project", proj]);
+  assert.equal(ok.status, 0, ok.stderr.toString());
+  assert.ok(existsSync(join(runDir(proj), "pick.json")));
+  const bad = spawnSync(process.execPath, [join(here, "directions.mjs"), "--resolve", "artist-pick v1 base=nope", "--directions", DJ, "--project", proj]);
+  assert.equal(bad.status, 2);
 });
