@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "components": [
+    {
+      "name": "Button",
+      "path": "src/Button.tsx",
+      "props": [],
+      "variants": {},
+      "tokensUsed": [
+        "--color-accent",
+        "--button-bg"
+      ],
+      "usage": {
+        "count": 2,
+        "files": [
+          "src/App.tsx",
+          "src/Login.tsx"
+        ]
+      },
+      "status": "current"
+    },
+    {
+      "name": "Card",
+      "path": "src/Card.tsx",
+      "props": [],
+      "variants": {},
+      "tokensUsed": [
+        "--color-surface",
+        "--space-4",
+        "--card-padding"
+      ],
+      "usage": {
+        "count": 1,
+        "files": [
+          "src/App.tsx"
+        ]
+      },
+      "status": "current"
+    },
+    {
+      "name": "Link",
+      "path": "src/Link.tsx",
+      "props": [],
+      "variants": {},
+      "tokensUsed": [
+        "--color-link"
+      ],
+      "usage": {
+        "count": 0,
+        "files": []
+      },
+      "status": "current"
+    }
+  ],
+  "layouts": [],
+  "schemas": [],
+  "packages": [],
+  "unparsed": []
+}
