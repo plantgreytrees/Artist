@@ -209,6 +209,8 @@ function checkEntry(axis, name, entry, cur, opts) {
   const hasMode = "light" in o || "dark" in o;
   const colour = known ? known.colour : hasMode || (typeof o.value === "string" && isColour(o.value.trim()));
   if (colour) {
+    // contrast is computed from palette only, so a colour elsewhere would escape the badges
+    if (axis !== "palette") fail("colour-off-palette", `${where}: colour tokens belong on palette`);
     if (typeof entry === "string") fail("missing-dark", `${where} needs light and dark values`);
     if (typeof o.light !== "string") fail("missing-light", `${where} needs a light value`);
     if (typeof o.dark !== "string") fail("missing-dark", `${where} needs a dark value`);
@@ -268,13 +270,15 @@ export function validateDirections(raw, cur, opts = {}) {
 const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-// CSS colour -> linear sRGB [r,g,b], or null when it is not a plain colour (gradients, var()). Alpha is ignored.
-function toLinear(css) {
+const unlin = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+
+// CSS colour -> gamma-encoded sRGB [r, g, b, alpha] in 0..1, or null when it is not a plain colour (gradients, var()).
+function toRgba(css) {
   const s = String(css ?? "").trim();
   if (HEX.test(s)) {
     let h = s.slice(1);
     if (h.length <= 4) h = [...h].map((x) => x + x).join("");
-    return [0, 2, 4].map((i) => lin(parseInt(h.slice(i, i + 2), 16) / 255));
+    return [0, 2, 4, 6].map((i) => (i < h.length ? parseInt(h.slice(i, i + 2), 16) / 255 : 1));
   }
   const m = /^(rgba?|hsla?|oklch)\(([^)]*)\)$/i.exec(s);
   if (!m) return null;
@@ -282,64 +286,85 @@ function toLinear(css) {
   const num = (p, scale = 1) => (p.endsWith("%") ? (parseFloat(p) / 100) * scale : parseFloat(p));
   const fn = m[1].toLowerCase();
   if (parts.length < 3) return null;
-  if (fn.startsWith("rgb")) {
-    const v = parts.slice(0, 3).map((p) => clamp01(num(p, 255) / 255));
-    return v.some(Number.isNaN) ? null : v.map(lin);
-  }
-  if (fn.startsWith("hsl")) {
+  const alpha = parts.length > 3 ? clamp01(num(parts[3])) : 1;
+  let rgb;
+  if (fn.startsWith("rgb")) rgb = parts.slice(0, 3).map((p) => clamp01(num(p, 255) / 255));
+  else if (fn.startsWith("hsl")) {
     const h = (((parseFloat(parts[0]) % 360) + 360) % 360) / 360;
     const sv = parseFloat(parts[1]) / 100;
     const lv = parseFloat(parts[2]) / 100;
-    if ([h, sv, lv].some(Number.isNaN)) return null;
     const q = lv < 0.5 ? lv * (1 + sv) : lv + sv - lv * sv;
     const p = 2 * lv - q;
     const f = (t) => {
       t = (t + 1) % 1;
       return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p;
     };
-    return [f(h + 1 / 3), f(h), f(h - 1 / 3)].map(lin);
+    rgb = [f(h + 1 / 3), f(h), f(h - 1 / 3)];
+  } else {
+    const L = num(parts[0]);
+    const C = parseFloat(parts[1]);
+    const H = (parseFloat(parts[2]) * Math.PI) / 180;
+    const a = C * Math.cos(H);
+    const b = C * Math.sin(H);
+    const l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m_ = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s_ = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+    rgb = [
+      4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
+      -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
+      -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
+    ].map((c) => unlin(clamp01(c)));
   }
-  const L = num(parts[0]);
-  const C = parseFloat(parts[1]);
-  const H = (parseFloat(parts[2]) * Math.PI) / 180;
-  if ([L, C, H].some(Number.isNaN)) return null;
-  const a = C * Math.cos(H);
-  const b = C * Math.sin(H);
-  const l_ = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const m_ = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s_ = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  return [
-    4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_,
-    -1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_,
-    -0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_,
-  ].map(clamp01);
+  const v = [...rgb, alpha];
+  return v.some(Number.isNaN) ? null : v;
 }
 
-const luminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-// Contrast ratio of two CSS colours (unrounded); null when either is not a plain colour.
-export function contrast(fg, bg) {
-  const a = toLinear(fg);
-  const b = toLinear(bg);
-  if (!a || !b) return null;
+const WHITE = [1, 1, 1, 1];
+const BLACK = [0, 0, 0, 1];
+// Source-over compositing in sRGB, as browsers blend; the result is opaque.
+const over = (top, under) => [0, 1, 2].map((i) => top[i] * top[3] + under[i] * (1 - top[3])).concat(1);
+const luminance = (c) => {
+  const [r, g, b] = c.slice(0, 3).map(lin);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const ratioOf = (a, b) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+};
+
+// Contrast ratio of two CSS colours (unrounded), translucent ones composited over base (default white);
+// null when either is not a plain colour.
+export function contrast(fg, bg, base = WHITE) {
+  const f = toRgba(fg);
+  const b = toRgba(bg);
+  if (!f || !b) return null;
+  const under = over(b, base);
+  return ratioOf(over(f, under), under);
 }
 
 const norm = (n) =>
   String(n)
     .toLowerCase()
+    .replace(/^--/, "")
     .replace(/^colou?r[.-]/, "")
     .replace(/\./g, "-");
+// Candidate names per role, most specific first. shadcn's bare `muted` and `accent` are backgrounds,
+// so their `-foreground` names come before them.
 const ROLES = {
   background: ["background", "bg", "canvas", "page"],
   surface: ["surface", "card", "panel"],
   text: ["text", "fg", "foreground", "text-primary"],
-  muted: ["text-muted", "muted", "text-secondary", "fg-muted"],
+  muted: ["text-muted", "muted-foreground", "text-secondary", "fg-muted", "muted"],
   link: ["link", "link-text", "text-link"],
-  accent: ["accent", "accent-text", "brand", "primary", "action"],
+  accent: ["accent-text", "accent-foreground", "primary", "brand", "action", "accent"],
 };
-const roleOf = (role, colours) => [...colours.keys()].find((k) => ROLES[role].includes(norm(k)));
+const roleOf = (role, colours) => {
+  const keys = [...colours.keys()];
+  for (const c of ROLES[role]) {
+    const k = keys.find((x) => norm(x) === c);
+    if (k) return k;
+  }
+};
 const FG = [
   ["text", "text"],
   ["muted", "muted text"],
@@ -351,19 +376,37 @@ const BG = [
   ["surface", "surface"],
 ];
 
-// colours: Map token -> {light, dark}. Returns every computable pair with its 2 dp ratio.
+const NOT_COMPUTED = "not computed: gradient or var() value";
+
+// colours: Map token -> {light, dark}. Returns every role pair present with its 2 dp ratio, or ratio null and a
+// note when a value is not a plain colour. Translucent colours are composited: background over the mode's base
+// (white or black), surface over the background, text over its backdrop.
 export function contrastPairs(colours) {
   const out = [];
-  for (const mode of ["light", "dark"])
+  const page = roleOf("background", colours);
+  for (const mode of ["light", "dark"]) {
+    const base = mode === "light" ? WHITE : BLACK;
+    const val = (n) => toRgba(colours.get(n)[mode]);
+    const pageRgba = page && val(page);
+    const under = { background: base, surface: pageRgba ? over(pageRgba, base) : base };
     for (const [fr, fl] of FG)
       for (const [br, bl] of BG) {
         const fg = roleOf(fr, colours);
         const bg = roleOf(br, colours);
         if (!fg || !bg) continue;
-        const r = contrast(colours.get(fg)[mode], colours.get(bg)[mode]);
-        if (r === null) continue;
+        const f = val(fg);
+        const b = val(bg);
+        // a translucent surface over a background we cannot resolve has no known backdrop
+        const backdropUnknown = br === "surface" && page && !pageRgba && b && b[3] < 1;
+        if (!f || !b || backdropUnknown) {
+          out.push({ pair: `${fl} on ${bl}`, mode, fg, bg, ratio: null, pass: false, note: NOT_COMPUTED });
+          continue;
+        }
+        const backdrop = over(b, under[br]);
+        const r = ratioOf(over(f, backdrop), backdrop);
         out.push({ pair: `${fl} on ${bl}`, mode, fg, bg, ratio: Math.round(r * 100) / 100, pass: r >= 4.5 });
       }
+  }
   return out;
 }
 
@@ -378,7 +421,9 @@ export function contrastFor(cur, source) {
   const pairs = contrastPairs(colours);
   return {
     pairs,
-    warnings: pairs.filter((p) => !p.pass).map(({ pair, mode, fg, bg, ratio }) => ({ pair, mode, fg, bg, ratio })),
+    warnings: pairs
+      .filter((p) => !p.pass)
+      .map(({ pair, mode, fg, bg, ratio, note }) => ({ pair, mode, fg, bg, ratio, ...(note && { note }) })),
   };
 }
 
@@ -710,7 +755,9 @@ ${group("Colour", rows.colour)}${group("Type ramp", rows.type)}${group("Spacing"
 // ---- contrast badges (ARCH-DIRECTIONS-08) ----
 
 const badge = (w) =>
-  `<span class="badge warn" role="note">Warning: ${esc(w.pair)} (${esc(w.mode)}) ${esc(w.ratio.toFixed(2))}:1, under 4.5:1</span>`;
+  w.ratio === null
+    ? `<span class="badge warn" role="note">Not checked: ${esc(w.pair)} (${esc(w.mode)}) ${esc(w.note)}</span>`
+    : `<span class="badge warn" role="note">Warning: ${esc(w.pair)} (${esc(w.mode)}) ${esc(w.ratio.toFixed(2))}:1, under 4.5:1</span>`;
 
 // ---- fonts (ARCH-DIRECTIONS-12) ----
 
@@ -869,9 +916,13 @@ const PAGE_JS = `(function () {
     var cbox = byId("mix-contrast");
     clear(cbox);
     var warns = data.contrast[sel.palette] || [];
-    if (!warns.length) cbox.appendChild(node("span", "badge ok", "All text pairs are at least 4.5:1"));
+    var computed = data.computed[sel.palette] || 0;
+    if (!warns.length && computed) cbox.appendChild(node("span", "badge ok", "All " + computed + " text pairs are at least 4.5:1"));
+    if (!warns.length && !computed) cbox.appendChild(node("span", "badge warn", "Not checked: no text and background tokens to pair"));
     warns.forEach(function (w) {
-      cbox.appendChild(node("span", "badge warn", "Warning: " + w.pair + " (" + w.mode + ") " + w.ratio.toFixed(2) + ":1, under 4.5:1"));
+      cbox.appendChild(node("span", "badge warn", w.ratio === null
+        ? "Not checked: " + w.pair + " (" + w.mode + ") " + w.note
+        : "Warning: " + w.pair + " (" + w.mode + ") " + w.ratio.toFixed(2) + ":1, under 4.5:1"));
     });
   }
   each(document.querySelectorAll("[data-view-btn]"), function (b) {
@@ -1004,8 +1055,13 @@ export function renderDirections({
       notes.wont = p.wontCarry.status === "checked" ? "" : p.wontCarry.note;
     }
   }
-  const contrast = { current: contrastFor(cur, []).warnings };
-  for (const d of list) contrast[d.id] = contrastFor(cur, d).warnings;
+  const contrast = {};
+  const computed = {};
+  for (const [id, src] of [["current", []], ...list.map((d) => [d.id, d])]) {
+    const c = contrastFor(cur, src);
+    contrast[id] = c.warnings;
+    computed[id] = c.pairs.filter((p) => p.ratio !== null).length;
+  }
   const baseEff = effectiveOf(cur, null);
 
   const cards = variants
@@ -1063,7 +1119,7 @@ ${specimens}
 <div class="panel"><h3>Pick line</h3><code id="pickline">artist-pick v1 base=current palette=current type=current shape=current motion=current</code>
 <button type="button" id="copy">Copy pick line</button><p>Paste it back to the assistant; it is resolved against this directions.json only.</p></div>
 </section></main>
-<script type="application/json" id="directions-data">${jsonForScript({ axes, contrast, notes })}</script>
+<script type="application/json" id="directions-data">${jsonForScript({ axes, contrast, computed, notes })}</script>
 <script>${PAGE_JS}</script>
 </body></html>
 `;

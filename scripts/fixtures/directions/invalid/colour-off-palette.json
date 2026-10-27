@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "current": {
+    "school": "minimalist",
+    "concept": "Quiet near-monochrome with one blue accent",
+    "evidence": [
+      "docs/design/DESIGN.md: Themes color.accent",
+      "src/App.tsx:12"
+    ]
+  },
+  "directions": [
+    {
+      "id": "swiss-grid",
+      "school": "swiss",
+      "brief": "swiss direction",
+      "palette": {
+        "color.accent": {
+          "light": "#c2410c",
+          "dark": "#fdba74"
+        }
+      },
+      "type": {
+        "body": "1.125rem"
+      },
+      "shape": {
+        "radius.md": "4px",
+        "color.text": {
+          "light": "#eeeeee",
+          "dark": "#111111"
+        }
+      },
+      "motion": {
+        "dur.fast": "100ms"
+      },
+      "base": {
+        "space.4": "20px"
+      }
+    },
+    {
+      "id": "bold-block",
+      "school": "brutalist",
+      "brief": "brutalist direction",
+      "palette": {
+        "color.accent": {
+          "light": "#ff3b00",
+          "dark": "#ff6a3d"
+        },
+        "color.glow": {
+          "proposed": true,
+          "light": "#ffe4d6",
+          "dark": "#3a1a10"
+        }
+      },
+      "type": {
+        "body": "1.125rem"
+      },
+      "shape": {
+        "radius.md": "0px"
+      },
+      "motion": {
+        "dur.fast": "100ms"
+      },
+      "base": {
+        "space.4": "20px"
+      }
+    },
+    {
+      "id": "paper",
+      "school": "editorial",
+      "brief": "editorial direction",
+      "palette": {
+        "color.accent": {
+          "light": "#c2410c",
+          "dark": "#fdba74"
+        }
+      },
+      "type": {
+        "heading": "fraunces, serif",
+        "body": "1.25rem"
+      },
+      "shape": {
+        "radius.md": "4px"
+      },
+      "motion": {
+        "dur.fast": "100ms"
+      },
+      "base": {
+        "space.4": "20px"
+      }
+    },
+    {
+      "id": "northern-lights",
+      "school": "aurora",
+      "brief": "aurora direction",
+      "palette": {
+        "color.accent": {
+          "light": "#7c3aed",
+          "dark": "#c4b5fd"
+        },
+        "color.background": {
+          "light": "#ffffff",
+          "dark": "#050816"
+        }
+      },
+      "type": {
+        "body": "1.125rem"
+      },
+      "shape": {
+        "radius.md": "4px"
+      },
+      "motion": {
+        "dur.fast": "300ms",
+        "ease.out": "cubic-bezier(0.16, 1, 0.3, 1)"
+      },
+      "base": {
+        "space.4": "20px"
+      }
+    }
+  ]
+}

@@ -103,6 +103,7 @@ for (const [file, reason] of [
   ["unknown-token", "unknown-token"],
   ["base-non-token", "base-not-token"],
   ["current-values", "current-values"],
+  ["colour-off-palette", "colour-off-palette"],
 ]) {
   test(`invalid ${file} exits 2 with ${reason}`, () => {
     throwsNamed(() => validateDirections(json("invalid", `${file}.json`), cur), reason);
@@ -242,6 +243,68 @@ test("a 3:1 pair is returned as a warning, never thrown", () => {
   const w = warnings.find((x) => x.pair === "text on background" && x.mode === "light");
   assert.equal(w.ratio, 3.03);
   assert.equal(w.fg, "color.text");
+});
+
+const colours = (o) =>
+  new Map(Object.entries(o).map(([k, v]) => [k, typeof v === "string" ? { light: v, dark: v } : v]));
+
+test("shadcn foreground names win over the bare muted and accent backgrounds", () => {
+  const pairs = contrastPairs(
+    colours({
+      "--background": "#ffffff",
+      "--card": "#ffffff",
+      "--foreground": "#0a0a0a",
+      "--muted": "#f5f5f5",
+      "--muted-foreground": "#737373",
+      "--accent": "#f5f5f5",
+      "--accent-foreground": "#171717",
+      "--primary": "#171717",
+    }),
+  );
+  const get = (pair) => pairs.find((p) => p.pair === pair && p.mode === "light");
+  assert.equal(get("muted text on background").fg, "--muted-foreground");
+  assert.equal(get("muted text on background").ratio, 4.74);
+  assert.equal(get("accent-text on background").fg, "--accent-foreground");
+  assert.ok(
+    pairs.every((p) => p.pass),
+    JSON.stringify(pairs.filter((p) => !p.pass)),
+  );
+});
+
+test("alpha colours are composited over the resolved background before contrast", () => {
+  const pairs = contrastPairs(
+    colours({
+      "color.background": { light: "#ffffff", dark: "#000000" },
+      "color.surface": { light: "rgba(0,0,0,0.05)", dark: "rgb(255 255 255 / 0.05)" },
+      "color.text": { light: "#111111", dark: "#eeeeee" },
+    }),
+  );
+  // 5% black over white is rgb(242.25); 5% white over black is rgb(12.75). Opaque, a 5% tint would score 1:1 or 21:1.
+  const r = (a, b) => Math.round(contrast(a, b) * 100) / 100;
+  const light = pairs.find((p) => p.pair === "text on surface" && p.mode === "light");
+  assert.equal(light.ratio, r("#111111", "rgb(242.25 242.25 242.25)"));
+  const dark = pairs.find((p) => p.pair === "text on surface" && p.mode === "dark");
+  assert.equal(dark.ratio, r("#eeeeee", "rgb(12.75 12.75 12.75)"));
+  assert.ok(light.pass && dark.pass);
+});
+
+test("a gradient pair is reported as not computed, never skipped or passed", () => {
+  const map = colours({
+    "color.background": { light: "linear-gradient(90deg, #ffffff, #eeeeee)", dark: "#000000" },
+    "color.text": { light: "#111111", dark: "#eeeeee" },
+  });
+  const p = contrastPairs(map).find((x) => x.pair === "text on background" && x.mode === "light");
+  assert.equal(p.ratio, null);
+  assert.equal(p.pass, false);
+  assert.match(p.note, /not computed/);
+  const v = valid();
+  v.directions[0].palette["color.background"] = { light: "linear-gradient(90deg, #ffffff, #eeeeee)", dark: "#000000" };
+  const d = validateDirections(v, cur);
+  const w = contrastFor(cur, d.directions[0]).warnings.find(
+    (x) => x.pair === "text on background" && x.mode === "light",
+  );
+  assert.equal(w.ratio, null);
+  assert.match(w.note, /not computed/);
 });
 
 // ---- pick line and resolve (ARCH-DIRECTIONS-09) ----
@@ -667,6 +730,23 @@ test("the 3:1 fixture renders a visible contrast badge per direction and in the 
   assert.ok(data.contrast["swiss-grid"].some((w) => w.pair === "text on background" && w.ratio === 3.03));
   assert.deepEqual(data.contrast.current, []);
   assert.match(html, /id="mix-contrast"/);
+});
+
+test("a gradient pair renders a not-checked badge and the mix never claims all-pass for it", () => {
+  const d = valid();
+  d.directions[0].palette["color.background"] = { light: "linear-gradient(90deg, #ffffff, #eeeeee)", dark: "#000000" };
+  const proj = mkProject();
+  const r = render(tmpJson(d), proj);
+  assert.equal(r.status, 0, r.stderr.toString());
+  const html = page(proj);
+  assert.match(html, /<span class="badge warn"[^>]*>Not checked: text on background \(light\) not computed/);
+  const data = JSON.parse(html.match(/id="directions-data">([\s\S]*?)<\/script>/)[1]);
+  const id = d.directions[0].id;
+  assert.ok(data.contrast[id].some((w) => w.ratio === null && /not computed/.test(w.note)));
+  assert.equal(data.computed.current, 16);
+  assert.ok(data.computed[id] < 16);
+  // the mix shows the all-pass note only with no warnings and at least one computed pair
+  assert.match(html, /if \(!warns\.length && computed\)/);
 });
 
 test("invalid input exits 2 and writes nothing", () => {
