@@ -1,0 +1,37 @@
+{
+  "schema": 3,
+  "raw_colours": [
+    {
+      "value": "#123456",
+      "file": "src/a.css",
+      "line": 4,
+      "justified": false
+    }
+  ],
+  "raw_spacing": [
+    {
+      "value": "13px",
+      "file": "src/spacing.css",
+      "line": 2,
+      "justified": false
+    }
+  ],
+  "raw_motion": [
+    {
+      "value": "0.42s",
+      "file": "src/motion.css",
+      "line": 3,
+      "justified": false
+    }
+  ],
+  "component_token_literals": [
+    {
+      "name": "Card.--card-padding",
+      "value": "12px",
+      "component": "Card",
+      "file": "docs/design/DESIGN.md",
+      "line": 5,
+      "justified": false
+    }
+  ]
+}

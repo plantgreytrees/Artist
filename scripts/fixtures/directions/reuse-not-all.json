@@ -1,0 +1,13 @@
+{
+  "schema": 2,
+  "raw_colours": [
+    {
+      "value": "#123456",
+      "file": "src/a.css",
+      "line": 4,
+      "justified": false
+    }
+  ],
+  "raw_spacing": [],
+  "raw_motion": []
+}
