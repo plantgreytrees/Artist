@@ -32,6 +32,7 @@ Read the code, do not invent values.
 6. Present token-file changes (`tokens.css`; Tailwind v4 `@theme` with the semantic tokens in an `@theme static` block; Bootstrap `--bs-*` overrides) as a diff. Apply it only after the user accepts; never rewrite token files silently.
 7. Propose Decisions, each with its `file:line` evidence, and write only the ones the user confirms. The table is append-only: a changed decision is a new row whose `supersedes` names the old `id`. If DESIGN.md prose marks a component deprecated, propose a matching `Deprecate <Name>` row and move the deprecation there.
 8. Apply any token changes proposed by `create` or `optimise` that the user accepts.
+   A `pick.json` from `create --directions` (`skills/create/references/directions.md`) is applied the same way: show its `tokenDiff` as one diff to the current theme's Semantic tokens, Themes, Type scale, Spacing, Motion and Component tokens and token files (a name ending in `@dark` is that token's dark value), never as a new `data-brand` set. Apply it once, only after the user accepts it, then list its `wontCarry` items (`file:line`) as literals to tokenise; if it says not checked, offer `audit`.
 9. Generate the inventory, then the design document, once:
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/inventory.mjs" --project <dir>
