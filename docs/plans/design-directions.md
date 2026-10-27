@@ -112,7 +112,7 @@ Depends on: none
 Tooling: implementer · gates dependency-auditor · skills test-driven-development · guards secrets-scan
 Depends on: directions-core
 - [ ] 2.1 Write failing test: every `fonts.json` entry (family, weights, source URL, version, sha256, licence file) has its woff2 file with a matching sha256 and an OFL licence file; ≤ 2 families per school → accept: fails before the assets exist
-- [ ] 2.2 Download latin-subset OFL woff2 files for the families the schools use into `scripts/assets/fonts/` with their `OFL.txt`; write `fonts.json` → accept: 2.1 passes; assets total < 2 MB
+- [ ] 2.2 Copy the latin-subset OFL woff2 files root already downloaded (runners have no network, `commands/_network.md`) from `/var/home/plant_grey_trees/Repositories/Artist/.craftsman/staging/fonts/<family>/` into `scripts/assets/fonts/<family>/` with their `LICENSE` (SIL OFL 1.1); write `fonts.json`. Families (all `@fontsource/<family>@5.3.0`, weights 400 and 700, files `<family>-latin-<w>-normal.woff2`, source URL `https://cdn.jsdelivr.net/npm/@fontsource/<family>@5.3.0/files/<file>`): inter, inter-tight, figtree, nunito, plus-jakarta-sans, space-grotesk, space-mono, fraunces, orbitron, jetbrains-mono, sora. Suggested school map (≤ 2 each): minimalist inter · swiss inter-tight · material figtree · flat nunito · neumorphism nunito · glassmorphism plus-jakarta-sans · brutalist space-grotesk + space-mono · editorial fraunces + inter · retro-futurist orbitron + jetbrains-mono · aurora sora → accept: 2.1 passes; assets total < 2 MB
 - [ ] 2.3 Map each SCHOOLS entry to its families in `directions.mjs` → accept: test asserts every school's families exist in fonts.json
 
 ### Step 3 — directions-render (., javascript, high)
