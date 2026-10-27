@@ -1,4 +1,7 @@
 {
+  "execution": {
+    "builtinAgents": ["Explore", "artist:design-critic"]
+  },
   "stopGate": {
     "commands": {
       "package.json": "node --test scripts/*.test.mjs"
