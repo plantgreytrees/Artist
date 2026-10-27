@@ -20,6 +20,11 @@
 | [artist-ui-plugin](./artist-ui-plugin.md) | skills-v2 | skills + README + evals | COMPLETE | all 1 acceptance criteria ticked; merged 43fa780 (commit f574a4c); validate --s… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | verify-impl | scripts/verify.mjs | COMPLETE | all 3 acceptance criteria ticked; merged fc71955 (commit 11cfec5); verify tests… | 2026-10-25 |
 | [artist-ui-plugin](./artist-ui-plugin.md) | verify-tests | scripts (tests first) | COMPLETE | all 2 acceptance criteria ticked; merged fc71955 (red commit 3cec547: ERR_MODUL… | 2026-10-25 |
+| [design-directions](./design-directions.md) | directions-core | scripts/directions.mjs (core) | PENDING | — | 2026-10-27 |
+| [design-directions](./design-directions.md) | directions-evals-docs | evals/create + README + CHANGELOG | PENDING | — | 2026-10-27 |
+| [design-directions](./design-directions.md) | directions-fonts | scripts/assets/fonts | PENDING | — | 2026-10-27 |
+| [design-directions](./design-directions.md) | directions-render | scripts/directions.mjs (renderer + CLI) | PENDING | — | 2026-10-27 |
+| [design-directions](./design-directions.md) | directions-skills | skills/create + skills/design-system | PENDING | — | 2026-10-27 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-reuse-check | scripts/reuse-check.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 2954531 (commit 3ed41b8); red 9 pass/5… | 2026-10-25 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-review-html | scripts/review-html.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 7bc6afc (commit 10569d2); root impleme… | 2026-10-25 |
 | [scrutinise-artist-ui-plugin](./scrutinise-artist-ui-plugin.md) | fix-verify | scripts/verify.mjs | COMPLETE | all 1 acceptance criteria ticked; merged 90a4dd8 (commit 2bc9f56); red 4 failin… | 2026-10-25 |
