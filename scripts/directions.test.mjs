@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -372,4 +373,44 @@ test("fixtures contain no external URLs", () => {
     readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
   for (const f of walk(fx)) assert.doesNotMatch(readFileSync(f, "utf8"), /https?:\/\//, f);
   assert.ok(existsSync(join(fx, "reuse-all.json")));
+});
+
+// ---- bundled fonts (ARCH-DIRECTIONS-12) ----
+
+const fontsDir = join(here, "assets", "fonts");
+const manifest = () => JSON.parse(readFileSync(join(fontsDir, "fonts.json"), "utf8"));
+
+test("every fonts.json entry has a woff2 with a matching sha256 and an OFL licence file", () => {
+  const m = manifest();
+  assert.ok(m.fonts.length > 0);
+  for (const f of m.fonts) {
+    assert.match(f.family, /^[a-z][a-z0-9-]*$/);
+    assert.ok(f.version && f.licence === "OFL-1.1");
+    assert.match(f.source, /^https:\/\/cdn\.jsdelivr\.net\/npm\/@fontsource\//);
+    const lic = readFileSync(join(fontsDir, f.licenceFile), "utf8");
+    assert.match(lic, /SIL Open Font License,? Version 1\.1/i, f.licenceFile);
+    assert.ok(f.files.length > 0);
+    for (const file of f.files) {
+      assert.match(file.name, /-latin-\d+-normal\.woff2$/);
+      assert.ok(f.weights.includes(file.weight), file.name);
+      assert.ok(file.source.startsWith(f.source) && file.source.endsWith(file.name));
+      const bytes = readFileSync(join(fontsDir, f.family, file.name));
+      assert.equal(createHash("sha256").update(bytes).digest("hex"), file.sha256, file.name);
+      assert.equal(bytes.subarray(0, 4).toString("latin1"), "wOF2");
+    }
+  }
+});
+
+test("bundled fonts total under 2 MB", () => {
+  let total = 0;
+  for (const f of manifest().fonts) for (const file of f.files) total += statSync(join(fontsDir, f.family, file.name)).size;
+  assert.ok(total < 2 * 1024 * 1024, String(total));
+});
+
+test("every school has at most two families and all exist in the manifest", () => {
+  const known = new Set(manifest().fonts.map((f) => f.family));
+  for (const s of SCHOOLS) {
+    assert.ok(Array.isArray(s.fonts) && s.fonts.length >= 1 && s.fonts.length <= 2, s.id);
+    for (const fam of s.fonts) assert.ok(known.has(fam), `${s.id}: ${fam}`);
+  }
 });
