@@ -36,7 +36,18 @@ const throwsNamed = (fn, reason) =>
 test("SCHOOLS is the fixed ten with ambitious only on three", () => {
   assert.deepEqual(
     SCHOOLS.map((s) => s.id),
-    ["minimalist", "swiss", "material", "flat", "neumorphism", "glassmorphism", "brutalist", "editorial", "retro-futurist", "aurora"],
+    [
+      "minimalist",
+      "swiss",
+      "material",
+      "flat",
+      "neumorphism",
+      "glassmorphism",
+      "brutalist",
+      "editorial",
+      "retro-futurist",
+      "aurora",
+    ],
   );
   assert.deepEqual(
     SCHOOLS.filter((s) => s.ambitious).map((s) => s.id),
@@ -64,7 +75,13 @@ test("SCHOOLS equals the ids and ambitious flags in directions.md's schools tabl
 
 test("an unknown school exits 2 (CLI)", () => {
   throwsNamed(() => validateDirections(json("invalid", "unknown-school.json"), cur), "unknown-school");
-  const r = spawnSync(process.execPath, [join(here, "directions.mjs"), "--directions", join(fx, "invalid", "unknown-school.json"), "--project", PROJECT]);
+  const r = spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--directions",
+    join(fx, "invalid", "unknown-school.json"),
+    "--project",
+    PROJECT,
+  ]);
   assert.equal(r.status, 2);
   assert.match(r.stderr.toString(), /unknown-school/);
 });
@@ -150,13 +167,31 @@ test("the grammar accepts the documented value shapes", () => {
     "Inter, sans-serif",
   ])
     assert.doesNotThrow(() => checkCssValue(ok), ok);
-  for (const bad of ["red; x", "{a}", "url(x)", "expression(1)", "calc(1px + 2px)", "<b>", "1px /* c */", "javascript:alert(1)", "var(--x)", "rgb(0,0,0) url(a)"])
-    assert.throws(() => checkCssValue(bad), (e) => e.exitCode === 2, bad);
+  for (const bad of [
+    "red; x",
+    "{a}",
+    "url(x)",
+    "expression(1)",
+    "calc(1px + 2px)",
+    "<b>",
+    "1px /* c */",
+    "javascript:alert(1)",
+    "var(--x)",
+    "rgb(0,0,0) url(a)",
+  ])
+    assert.throws(
+      () => checkCssValue(bad),
+      (e) => e.exitCode === 2,
+      bad,
+    );
 });
 
 test("font families are checked against a supplied manifest", () => {
   assert.doesNotThrow(() => checkCssValue("Inter, sans-serif", { fonts: ["Inter"] }));
-  assert.throws(() => checkCssValue("Comic Sans", { fonts: ["Inter"] }), (e) => e.reason === "css-value");
+  assert.throws(
+    () => checkCssValue("Comic Sans", { fonts: ["Inter"] }),
+    (e) => e.reason === "css-value",
+  );
 });
 
 // ---- Current (ARCH-DIRECTIONS-04) ----
@@ -235,8 +270,15 @@ test("parsePickLine rejects extra keys, bad order and injected text", () => {
     " " + LINE,
     "",
   ])
-    assert.throws(() => parsePickLine(bad), (e) => e.exitCode === 2 && e.reason === "pick-line", JSON.stringify(bad));
-  assert.throws(() => parsePickLine(42), (e) => e.exitCode === 2);
+    assert.throws(
+      () => parsePickLine(bad),
+      (e) => e.exitCode === 2 && e.reason === "pick-line",
+      JSON.stringify(bad),
+    );
+  assert.throws(
+    () => parsePickLine(42),
+    (e) => e.exitCode === 2,
+  );
 });
 
 test("resolvePick writes pick.json schema 1 with tokenDiff in the rounds.json shape", () => {
@@ -316,15 +358,27 @@ test("impact joins tokensUsed and usage to each changed token", () => {
   assert.equal(imp.status, "computed");
   const accent = imp.items.find((i) => i.token === "color.accent");
   assert.equal(accent.variable, "--color-accent");
-  assert.deepEqual(accent.components, [{ name: "Button", path: "src/Button.tsx", usage: { count: 2, files: ["src/App.tsx", "src/Login.tsx"] } }]);
+  assert.deepEqual(accent.components, [
+    { name: "Button", path: "src/Button.tsx", usage: { count: 2, files: ["src/App.tsx", "src/Login.tsx"] } },
+  ]);
   const sp = imp.items.find((i) => i.token === "space.4");
-  assert.deepEqual(sp.components.map((c) => c.name), ["Card"]);
+  assert.deepEqual(
+    sp.components.map((c) => c.name),
+    ["Card"],
+  );
   assert.deepEqual(imp.unsupported, []);
 });
 
 test("a component token joins by its own variable", () => {
-  const imp = impactOf({ tokens: [{ name: "--button-bg", axis: "base" }], current: cur, inventory: json("inventory.json") });
-  assert.deepEqual(imp.items[0].components.map((c) => c.name), ["Button"]);
+  const imp = impactOf({
+    tokens: [{ name: "--button-bg", axis: "base" }],
+    current: cur,
+    inventory: json("inventory.json"),
+  });
+  assert.deepEqual(
+    imp.items[0].components.map((c) => c.name),
+    ["Button"],
+  );
 });
 
 test("absent inventory says so and does not fail", () => {
@@ -352,14 +406,26 @@ test("wontCarry: absent reuse.json is not checked and names design-system audit"
 
 test("wontCarry: a reuse.json without the --all keys counts as not checked", () => {
   const dirs = validateDirections(valid(), cur);
-  const p = resolvePick({ line: LINE, directions: dirs, current: cur, inventory: json("inventory.json"), reuse: json("reuse-not-all.json") });
+  const p = resolvePick({
+    line: LINE,
+    directions: dirs,
+    current: cur,
+    inventory: json("inventory.json"),
+    reuse: json("reuse-not-all.json"),
+  });
   assert.equal(p.wontCarry.status, "not-checked");
   assert.match(p.wontCarry.note, /design-system audit/);
 });
 
 test("wontCarry from an --all reuse.json lists file:line for the touched axes", () => {
   const dirs = validateDirections(valid(), cur);
-  const p = resolvePick({ line: LINE, directions: dirs, current: cur, inventory: json("inventory.json"), reuse: json("reuse-all.json") });
+  const p = resolvePick({
+    line: LINE,
+    directions: dirs,
+    current: cur,
+    inventory: json("inventory.json"),
+    reuse: json("reuse-all.json"),
+  });
   assert.equal(p.wontCarry.status, "checked");
   const locs = p.wontCarry.items.map((i) => `${i.kind} ${i.location}`);
   assert.ok(locs.includes("raw_colours src/a.css:4"));
@@ -370,7 +436,9 @@ test("wontCarry from an --all reuse.json lists file:line for the touched axes", 
 
 test("fixtures contain no external URLs", () => {
   const walk = (d) =>
-    readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+    readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)],
+    );
   for (const f of walk(fx)) assert.doesNotMatch(readFileSync(f, "utf8"), /https?:\/\//, f);
   assert.ok(existsSync(join(fx, "reuse-all.json")));
 });
@@ -403,7 +471,8 @@ test("every fonts.json entry has a woff2 with a matching sha256 and an OFL licen
 
 test("bundled fonts total under 2 MB", () => {
   let total = 0;
-  for (const f of manifest().fonts) for (const file of f.files) total += statSync(join(fontsDir, f.family, file.name)).size;
+  for (const f of manifest().fonts)
+    for (const file of f.files) total += statSync(join(fontsDir, f.family, file.name)).size;
   assert.ok(total < 2 * 1024 * 1024, String(total));
 });
 
@@ -418,14 +487,14 @@ test("every school has at most two families and all exist in the manifest", () =
 // ---- renderer (ARCH-DIRECTIONS-06/07/08/12) ----
 
 const TS = "20260101T000000Z";
-const CSP_META =
-  `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:">`;
+const CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:">`;
 
 function mkProject({ inventory = false, pkg = null, files = {} } = {}) {
   const proj = mkdtempSync(join(tmpdir(), "dirr-"));
   mkdirSync(join(proj, "docs", "design"), { recursive: true });
   writeFileSync(join(proj, "docs", "design", "DESIGN.md"), md);
-  if (inventory) writeFileSync(join(proj, "docs", "design", "inventory.json"), readFileSync(join(fx, "inventory.json")));
+  if (inventory)
+    writeFileSync(join(proj, "docs", "design", "inventory.json"), readFileSync(join(fx, "inventory.json")));
   if (pkg) writeFileSync(join(proj, "package.json"), JSON.stringify(pkg));
   for (const [rel, body] of Object.entries(files)) {
     mkdirSync(dirname(join(proj, rel)), { recursive: true });
@@ -434,7 +503,16 @@ function mkProject({ inventory = false, pkg = null, files = {} } = {}) {
   return proj;
 }
 const render = (dj, proj, extra = []) =>
-  spawnSync(process.execPath, [join(here, "directions.mjs"), "--directions", dj, "--project", proj, "--timestamp", TS, ...extra]);
+  spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--directions",
+    dj,
+    "--project",
+    proj,
+    "--timestamp",
+    TS,
+    ...extra,
+  ]);
 const runDir = (proj) => join(proj, ".artist", "directions", TS);
 const page = (proj) => readFileSync(join(runDir(proj), "directions.html"), "utf8");
 const DJ = join(fx, "directions.json");
@@ -458,8 +536,12 @@ test("two runs with the same inputs are byte-identical", () => {
   const proj = mkProject();
   const snap = () => {
     const walk = (d) =>
-      readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
-    return walk(runDir(proj)).sort().map((f) => [f, createHash("sha256").update(readFileSync(f)).digest("hex")]);
+      readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)],
+      );
+    return walk(runDir(proj))
+      .sort()
+      .map((f) => [f, createHash("sha256").update(readFileSync(f)).digest("hex")]);
   };
   assert.equal(render(DJ, proj).status, 0);
   const a = snap();
@@ -484,11 +566,30 @@ test("every view is present: final grid and one-at-a-time, specimen, pick and mi
   render(DJ, proj);
   const html = page(proj);
   for (const s of [
-    'id="view-final"', 'data-layout="grid"', 'data-layout-btn="grid"', 'data-layout-btn="one"',
-    'id="view-specimen"', 'id="view-mix"', 'data-view-btn="final"', 'data-view-btn="specimen"', 'data-view-btn="mix"',
-    'data-axis="base"', 'data-axis="palette"', 'data-axis="type"', 'data-axis="shape"', 'data-axis="motion"',
-    'data-v="mix"', 'data-mode-btn="dark"', 'data-mode-btn="light"', 'id="toggle-rm"', 'id="toggle-rt"',
-    'id="mix-diff"', 'id="mix-impact"', 'id="mix-contrast"', 'id="pickline"', "artist-pick v1",
+    'id="view-final"',
+    'data-layout="grid"',
+    'data-layout-btn="grid"',
+    'data-layout-btn="one"',
+    'id="view-specimen"',
+    'id="view-mix"',
+    'data-view-btn="final"',
+    'data-view-btn="specimen"',
+    'data-view-btn="mix"',
+    'data-axis="base"',
+    'data-axis="palette"',
+    'data-axis="type"',
+    'data-axis="shape"',
+    'data-axis="motion"',
+    'data-v="mix"',
+    'data-mode-btn="dark"',
+    'data-mode-btn="light"',
+    'id="toggle-rm"',
+    'id="toggle-rt"',
+    'id="mix-diff"',
+    'id="mix-impact"',
+    'id="mix-contrast"',
+    'id="pickline"',
+    "artist-pick v1",
   ])
     assert.ok(html.includes(s), s);
   assert.match(html, /class="cell diff"/);
@@ -506,23 +607,27 @@ test("CSP meta is exact, no external URLs, fonts only under fonts/", () => {
   assert.doesNotMatch(html, /(?:src|href)\s*=\s*["']?(?:https?:|\/\/)/i);
   const urls = [...html.matchAll(/url\(([^)]*)\)/g)].map((m) => m[1].replace(/["']/g, ""));
   assert.ok(urls.length > 0);
-  for (const u of urls) assert.match(u, /^fonts\/[a-z0-9._\/-]+\.woff2$/, u);
+  for (const u of urls) assert.match(u, /^fonts\/[a-z0-9._/-]+\.woff2$/, u);
 });
 
 test("only the fonts a run uses are copied", () => {
   const proj = mkProject();
   render(DJ, proj);
-  assert.deepEqual(
-    readdirSync(join(runDir(proj), "fonts")).sort(),
-    ["fraunces", "inter", "inter-tight", "sora", "space-grotesk", "space-mono"],
-  );
+  assert.deepEqual(readdirSync(join(runDir(proj), "fonts")).sort(), [
+    "fraunces",
+    "inter",
+    "inter-tight",
+    "sora",
+    "space-grotesk",
+    "space-mono",
+  ]);
   assert.ok(existsSync(join(runDir(proj), "fonts", "sora", "sora-latin-400-normal.woff2")));
 });
 
 test("a <script> in a brief, concept or evidence renders escaped", () => {
   const d = valid();
   d.directions[0].brief = "<script>alert(1)</script>";
-  d.current.concept = '<img src=x onerror=alert(2)>';
+  d.current.concept = "<img src=x onerror=alert(2)>";
   d.current.evidence = ['"><script>alert(3)</script>'];
   const proj = mkProject();
   const r = render(tmpJson(d), proj);
@@ -539,7 +644,10 @@ test("inline script only switches precomputed values: no eval, Function or inner
   render(DJ, proj);
   const [js] = scriptsOf(page(proj));
   assert.ok(js.length > 500);
-  assert.doesNotMatch(js, /\beval\b|\bFunction\b|innerHTML|outerHTML|insertAdjacentHTML|document\.write|setTimeout\(\s*["']/);
+  assert.doesNotMatch(
+    js,
+    /\beval\b|\bFunction\b|innerHTML|outerHTML|insertAdjacentHTML|document\.write|setTimeout\(\s*["']/,
+  );
 });
 
 test("no input path accepts HTML: renderer ignores markup keys and fails unknown ones", () => {
@@ -581,7 +689,11 @@ test("the impact list joins the inventory, says so when it is absent, and reuse.
   render(DJ, withInv, ["--reuse", join(fx, "reuse-all.json")]);
   let html = page(withInv);
   const data = JSON.parse(html.match(/id="directions-data">([\s\S]*?)<\/script>/)[1]);
-  assert.ok(data.axes.palette["bold-block"].impact.some((i) => i.token === "color.accent" && i.components.some((c) => c.name === "Button")));
+  assert.ok(
+    data.axes.palette["bold-block"].impact.some(
+      (i) => i.token === "color.accent" && i.components.some((c) => c.name === "Button"),
+    ),
+  );
   assert.ok(data.axes.palette["bold-block"].wont.some((w) => w.value === "#123456"));
   const bare = mkProject();
   render(DJ, bare);
@@ -609,7 +721,9 @@ test("the project's font loads by relative path when found via token files, else
   render(DJ, none);
   assert.doesNotMatch(page(none), /fonts\/current/);
   assert.match(page(none), /Acme Sans[^<]*fallback stack/);
-  const escape = mkProject({ files: { "src/tokens.css": css.replace("../assets/acme", "../../../etc/acme"), "assets/acme.woff2": "x" } });
+  const escape = mkProject({
+    files: { "src/tokens.css": css.replace("../assets/acme", "../../../etc/acme"), "assets/acme.woff2": "x" },
+  });
   render(DJ, escape);
   assert.doesNotMatch(page(escape), /fonts\/current/);
 });
@@ -617,9 +731,78 @@ test("the project's font loads by relative path when found via token files, else
 test("CLI --resolve after render writes pick.json into the render's run dir", () => {
   const proj = mkProject();
   assert.equal(render(DJ, proj).status, 0);
-  const ok = spawnSync(process.execPath, [join(here, "directions.mjs"), "--resolve", LINE, "--directions", DJ, "--project", proj]);
+  const ok = spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--resolve",
+    LINE,
+    "--directions",
+    DJ,
+    "--project",
+    proj,
+  ]);
   assert.equal(ok.status, 0, ok.stderr.toString());
   assert.ok(existsSync(join(runDir(proj), "pick.json")));
-  const bad = spawnSync(process.execPath, [join(here, "directions.mjs"), "--resolve", "artist-pick v1 base=nope", "--directions", DJ, "--project", proj]);
+  const bad = spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--resolve",
+    "artist-pick v1 base=nope",
+    "--directions",
+    DJ,
+    "--project",
+    proj,
+  ]);
   assert.equal(bad.status, 2);
+});
+
+// skills: the directions procedure, create's optional step and design-system's apply step
+const skillDoc = (...p) => readFileSync(join(here, "..", "skills", ...p), "utf8");
+const section = (doc, heading) => doc.split(`\n${heading}\n`)[1].split("\n## ")[0];
+
+test("directions.md requires an evidenced concept, never a score, and never dispatches agents", () => {
+  const doc = skillDoc("create", "references", "directions.md");
+  const proc = section(doc, "## Procedure");
+  assert.match(proc, /`evidence`: DESIGN\.md rows .* or code `file:line`/);
+  assert.match(proc, /as a judgement with that evidence, never as a score/);
+  assert.match(proc, /3 to 5/);
+  assert.match(proc, /at least one must be ambitious/);
+  assert.match(proc, /scrims/);
+  assert.match(proc, /prefers-reduced-motion/);
+  assert.match(proc, /prefers-reduced-transparency/);
+  assert.match(proc, /LCP within 2500 ms/);
+  assert.doesNotMatch(doc, /subagent_type|\bAgent\s*\(|\bTask\s*\(/);
+  for (const l of doc.split("\n").filter((l) => /dispatch|design-critic/i.test(l)))
+    assert.match(l, /\b(not|never|Never)\b/, `dispatch line must be a prohibition: ${l}`);
+});
+
+test("create names --directions only in an optional step 0 linking directions.md; Loop and Stop condition unchanged", () => {
+  const doc = skillDoc("create", "SKILL.md");
+  const lines = doc.split("\n").filter((l) => l.includes("--directions"));
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /^argument-hint: .*\[--directions \[n\]\]/);
+  assert.match(lines[1], /^0\. Optional, only with `--directions \[n\]`: .*\(references\/directions\.md\)/);
+  const sha = (s) => createHash("sha256").update(s).digest("hex");
+  assert.equal(
+    sha(section(doc, "## Loop (max 3 rounds)")),
+    "0e0d3c2a685dc8346b76ddc0f785a69a353fd6bb36030e0ee0755b3216dc524d",
+  );
+  assert.equal(
+    sha(section(doc, "## Stop condition")),
+    "326d65b9dc389bb8631928730805ec45454a9f1f4e799308c771695be24ea25e",
+  );
+  assert.deepEqual(readdirSync(join(here, "..", "skills")).sort(), ["create", "design-system", "optimise", "verify"]);
+  assert.deepEqual(readdirSync(join(here, "..", "agents")), ["design-critic.md"]);
+});
+
+test("the pick goes to design-system init step 8 as one diff to the current theme; nothing else writes DESIGN.md", () => {
+  const apply = section(skillDoc("create", "references", "directions.md"), "## Apply");
+  assert.match(apply, /`design-system` skill's init step 8/);
+  assert.match(apply, /once, as one diff to the current theme, only after the user accepts it/);
+  assert.match(apply, /Do not edit `docs\/design\/DESIGN\.md` or any token file here/);
+  const step8 = skillDoc("design-system", "SKILL.md").split("\n8. ")[1].split("\n9. ")[0];
+  assert.match(step8, /`pick\.json`/);
+  assert.match(step8, /never as a new `data-brand` set/);
+  assert.match(step8, /Apply it once, only after the user accepts it/);
+  assert.match(step8, /`wontCarry`/);
+  const src = readFileSync(join(here, "directions.mjs"), "utf8");
+  for (const m of src.matchAll(/writeFileSync\(([^,]+),/g)) assert.doesNotMatch(m[1], /DESIGN|token/i);
 });
