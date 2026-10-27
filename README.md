@@ -14,7 +14,7 @@ Artist is a Claude Code plugin that designs, builds, measures and refines web an
 | Skill | What it does |
 | --- | --- |
 | `design-system` | Derives, audits and maintains `docs/design/DESIGN.md` (tokens, components, layouts, packages) from your code. It is the only writer of that file. |
-| `create` | Builds or refines UI against DESIGN.md in up to three measured rounds, scored by an isolated design critic and a reuse check. |
+| `create` | Builds or refines UI against DESIGN.md in up to three measured rounds, scored by an isolated design critic and a reuse check. With `--directions [n]` it first names your current design concept, renders 3–5 contrasting directions from ten fixed schools in an offline `directions.html` (final result, specimen, pick & mix), and applies your pick through `design-system`. |
 | `verify` | Measures a running page with `scripts/verify.mjs` (screenshots, axe, Core Web Vitals) and explains each failed threshold. |
 | `optimise` | Fixes measured performance and accessibility failures and UI-level security smells. |
 
