@@ -3,7 +3,7 @@
 > and `/architect --update directions` should be run.
 
 # Directions architecture
-_Last verified: 2026-10-26 at `341399e` · Source idea: [design-directions](../ideas/design-directions.md)_
+_Last verified: 2026-10-28 at `a282119` · Source idea: [design-directions](../ideas/design-directions.md)_
 
 ## In plain English
 `create --directions` adds one optional step before artist builds anything.
@@ -39,7 +39,7 @@ flowchart LR
   S --> H[directions.html + fonts/]
   H -->|user copies pick line| C
   C -->|directions.mjs --resolve| P[(pick.json: tokenDiff, contrastWarnings, impact, wontCarry)]
-  P --> DS[skills/design-system init step 7]
+  P --> DS[skills/design-system init step 8]
   DS -->|accepted diff| TF[(DESIGN.md + token files: current theme)]
   TF --> L[create loop: verify + reuse-check + design-critic, unchanged gates]
 ```
@@ -53,21 +53,22 @@ flowchart LR
 | ARCH-DIRECTIONS-04 | Current values come from DESIGN.md via design-md.mjs; the concept name is a judgement | numbers and values come from scripts (ARCH-VERIFY-18) | the model retyping current tokens; an automatic style classifier (no reliable method found) |
 | ARCH-DIRECTIONS-05 | directions.json maps existing or proposed token names, light and dark | a pick must land as a theme diff (ARCH-PLUGIN-35), and markup cannot be mixed | directions as generated HTML; layout as a mixable axis |
 | ARCH-DIRECTIONS-06 | One script renders a fixed sample screen in three views | deterministic, testable, about 1× cost, no app build | N real page builds (0xdesign-style); a temporary dev route; a canvas tool |
-| ARCH-DIRECTIONS-07 | Self-contained page, strict CSP, escaping, CSS value grammar | token values are untrusted, and a style attribute is an injection sink | allowing arbitrary CSS strings; a page with no script (pick & mix needs JS) |
+| ARCH-DIRECTIONS-07 | _Superseded by ARCH-DIRECTIONS-15_ | | |
 | ARCH-DIRECTIONS-08 | Contrast is computed and warns, never blocks | user choice; axe in the create loop still gates the built result | blocking the render until fixed |
 | ARCH-DIRECTIONS-09 | The pick comes back as a validated pick line → `pick.json` | ids only, so pasted text cannot inject values; rebuilt deterministically | a downloaded pick.json; both line and download; a local server |
-| ARCH-DIRECTIONS-10 | Applied once to the current theme by design-system | project-wide carry-over by variables, one owner of DESIGN.md (ARCH-PLUGIN-14/38) | a new `data-brand` theme per pick; editing per page |
+| ARCH-DIRECTIONS-10 | Applied once to the current theme by design-system (init step 8) | project-wide carry-over by variables, one owner of DESIGN.md (ARCH-PLUGIN-14/38) | a new `data-brand` theme per pick; editing per page |
 | ARCH-DIRECTIONS-11 | Impact from the inventory join; "won't carry" only from reuse.json | existing deterministic data; findings come only from reuse-check (ARCH-VERIFY-18) | the model listing affected files; grepping in the renderer |
 | ARCH-DIRECTIONS-12 | Bundled OFL woff2 fonts with a sha-pinned manifest | no network allowed; real typefaces make the type axis judgeable | a Google Fonts exception; system fallbacks only |
 | ARCH-DIRECTIONS-13 | node --test suite plus a create eval case | repo convention (ARCH-VERIFY-11, ARCH-PLUGIN-20) | manual checks |
-| ARCH-DIRECTIONS-14 | Starts after component_token_literals and skill-create-optimise | the "won't carry across" list depends on it, and they share SKILL.md files | starting in parallel (merge conflicts, an empty warning list) |
+| ARCH-DIRECTIONS-14 | Starts after component_token_literals and skill-create-optimise (met); component formats inventory cannot parse (`.svelte`, `.astro`, `.marko`, `.riot`), found by a bounded project walk, show impact as unsupported, never zero | the "won't carry across" list depends on it, and they share SKILL.md files; inventory never lists those files, so only a walk can see them | starting in parallel (merge conflicts, an empty warning list); trusting inventory contents alone (the unsupported branch never fired) |
+| ARCH-DIRECTIONS-15 | Self-contained page, strict CSP, escaping, CSS value grammar that names every accepted form (rgba/hsla, `deg`, bare numbers, `cubic-bezier()`, easing keywords, `inset`) | token values are untrusted, and a style attribute is an injection sink; motion, type and shape tokens need these safe forms, and the rule must match the code | allowing arbitrary CSS strings; a page with no script (pick & mix needs JS); keeping the shorter 07 list (rule and code disagree) |
 
 Inherited and unchanged: ARCH-PLUGIN-07/09/10/11 (skills, agent, critic),
 ARCH-PLUGIN-14/38 (only design-system writes DESIGN.md and token files, after
 you accept a diff), ARCH-PLUGIN-24/28 (the stop condition and motion rules
 apply to the ambitious pick too), ARCH-PLUGIN-35 (Themes, light and dark),
 ARCH-VERIFY-11/18/23 (test runner, numbers from scripts, inventory schema).
-No decided rule is amended.
+ARCH-DIRECTIONS-07 is amended by ARCH-DIRECTIONS-15 (2026-10-28, after review round 1).
 
 ## Data & flows
 ```mermaid
@@ -106,9 +107,11 @@ to gitignore. DESIGN.md and the token files stay design-system's alone.
   where axe fails it and the loop spends rounds fixing it.
 - Bundled fonts add about 1.5 MB to the plugin and need their licence files
   and sha256 kept current.
-- The impact list is only as good as the inventory. Vue/Nuxt components need
-  the unmerged `worktree-vue-inventory` work; until then the list says the
-  format is unsupported instead of showing zero.
+- The impact list is only as good as the inventory (Vue/Nuxt included).
+  Svelte, Astro, Marko and Riot components are found by a bounded walk of the
+  project and marked unsupported instead of showing zero.
+- Contrast is not computed for gradient or `var()` values; the page shows a
+  "not checked" badge for those pairs instead of an all-pass note.
 - React Native projects get a web approximation of their theme.
 
 ## Glossary
