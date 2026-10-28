@@ -37,7 +37,7 @@ The ten ids below are the only schools. `SCHOOLS` in `scripts/directions.mjs` mu
 - `current` names the present concept with `file:line` or DESIGN.md row evidence. It is a judgement, never a score, and carries no token values: Current's values are read from `docs/design/DESIGN.md` (format 2) by the script.
 - 3 to 5 directions, distinct schools, none equal to `current.school`, at least one ambitious school. Direction ids are lowercase (`a-z`, digits, `-`) and `current` is reserved.
 - Each axis maps a DESIGN.md token name (Semantic, Type scale, Spacing, Motion) or a Component token variable to a value, or a new name with `"proposed": true`. A colour token carries both `light` and `dark` and belongs on `palette` only (a colour on another axis exits 2, `colour-off-palette`). `base` holds only Spacing and Component tokens, never markup or layout.
-- Values must match the strict CSS grammar: hex, `rgb()`, `hsl()`, `oklch()`, linear and radial gradients of those, numbers with `px`, `rem`, `em`, `ms`, `%`, `cubic-bezier()`, and font family names. Anything else exits 2.
+- Values must match the strict CSS grammar: hex, `rgb()`/`rgba()`, `hsl()`/`hsla()`, `oklch()` with numeric arguments only (a hue may carry `deg`; `none`, `turn` and words exit 2), linear and radial gradients of those, numbers with `px`, `rem`, `em`, `ms`, `%`, `cubic-bezier()`, and font family names. Anything else exits 2.
 
 ## Fonts
 
@@ -73,6 +73,6 @@ It writes `pick.json` into the same run directory and prints its path. Exit 2 me
 
 ## Apply
 
-1. Show the user the pick, the `tokenDiff`, the `contrastWarnings`, and the `impact` list (which components use each changed token), exactly as `pick.json` has them. If `impact` or `wontCarry` says not checked or unsupported, show that too.
+1. Show the user the pick, the `tokenDiff`, the `contrastWarnings`, and the `impact` list (which components use each changed token), exactly as `pick.json` has them. If `impact` or `wontCarry` says not checked or unsupported, show that too. A `contrastWarnings` entry with `ratio: null` is a pair that was not checked: show its `note`, never a ratio.
 2. Hand `pick.json` to the `design-system` skill's init step 8. It applies the `tokenDiff` once, as one diff to the current theme, only after the user accepts it, then lists the `wontCarry` items for tokenising. Do not edit `docs/design/DESIGN.md` or any token file here.
 3. Continue with `create`'s Setup and Loop unchanged against the updated DESIGN.md. The ambitious school gets the same rounds, critic and stop condition as any other.
