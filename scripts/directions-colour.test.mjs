@@ -50,3 +50,15 @@ test("hsl saturation and lightness are clamped to 0..100%", () => {
   assert.equal(contrast("hsl(0 50% 150%)", "#ffffff").toFixed(2), "1.00");
   assert.equal(contrast("hsl(0 150% 50%)", "#ffffff").toFixed(2), contrast("#ff0000", "#ffffff").toFixed(2));
 });
+
+test("a colour outside the grammar is not scored, even when it comes from DESIGN.md", () => {
+  assert.equal(contrast("hsl(0.5turn 50% 50%)", "#fff"), null);
+  assert.equal(contrast("rgb(255abc 0 0)", "#fff"), null);
+  assert.equal(contrast("hsl(180 50% 50%)", "#fff").toFixed(2), "2.22");
+});
+
+test("one separator style per colour function", () => {
+  for (const v of ["rgb(0 0 0 0.5)", "rgb(0, 0 0)", "rgb(0,0,0 / .5)"]) rejects(v);
+  for (const v of ["rgba(0, 0, 0, 0.5)", "rgb(0 0 0 / 50%)", "hsla(210, 40%, 50%, 0.8)", "rgb(0,0,0)"])
+    assert.equal(checkCssValue(v), v);
+});

@@ -66,3 +66,15 @@ test("impactOf still accepts a plain list of unsupported files", () => {
   assert.deepEqual(imp.unsupported, ["src/Card.svelte"]);
   assert.doesNotMatch(imp.note, /walk stopped/);
 });
+
+test("a truncated walk without a limit falls back to the default in its note", () => {
+  const imp = impactOf({ tokens, current, inventory, unsupported: { files: [], truncated: true } });
+  assert.match(imp.note, /project walk stopped at 20000 entries/);
+});
+
+test("a walk of exactly limit entries that finishes is not truncated", () => {
+  const files = {};
+  for (let i = 0; i < 4; i++) files[`f${i}.txt`] = "x";
+  const walk = unsupportedFilesOf(project(files), { limit: 4 });
+  assert.equal(walk.truncated, false);
+});
