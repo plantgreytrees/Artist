@@ -3,7 +3,7 @@
 > and `/architect --update directions` should be run.
 
 # Directions architecture
-_Last verified: 2026-10-28 at `f2ff6fd` · Source idea: [design-directions](../ideas/design-directions.md)_
+_Last verified: 2026-10-28 at `8fd5399` · Source idea: [design-directions](../ideas/design-directions.md)_
 
 ## In plain English
 `create --directions` adds one optional step before artist builds anything.
