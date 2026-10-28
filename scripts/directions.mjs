@@ -449,9 +449,48 @@ export function parsePickLine(line) {
 }
 
 const SUPPORTED = /\.(?:tsx|jsx|ts|js|mjs|cjs|vue)$/;
+// Component formats inventory.mjs does not parse; found by walking the project, since inventory never lists them.
+const UNSUPPORTED_COMPONENT = /\.(?:svelte|astro|marko|riot)$/;
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".artist",
+  "dist",
+  "build",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  "coverage",
+]);
+const WALK_LIMIT = 20000;
+
+// Sorted project-relative paths of component files in unsupported formats. Bounded; symlinks are not followed.
+export function unsupportedFilesOf(project) {
+  const out = [];
+  const stack = [""];
+  let seen = 0;
+  while (stack.length && seen < WALK_LIMIT) {
+    const rel = stack.pop();
+    let entries;
+    try {
+      entries = readdirSync(join(project, rel), { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      if (++seen > WALK_LIMIT) break;
+      const p = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) stack.push(p);
+      } else if (e.isFile() && UNSUPPORTED_COMPONENT.test(e.name)) out.push(p);
+    }
+  }
+  return out.sort();
+}
 
 // Which components reach each changed token. tokens: [{name, axis}] (names without the @dark suffix).
-export function impactOf({ tokens, current, inventory }) {
+// unsupported: extra component paths in formats inventory cannot parse (see unsupportedFilesOf).
+export function impactOf({ tokens, current, inventory, unsupported: found = [] }) {
   if (!inventory)
     return {
       status: "inventory-absent",
@@ -461,7 +500,10 @@ export function impactOf({ tokens, current, inventory }) {
     };
   const comps = Array.isArray(inventory.components) ? inventory.components : [];
   const unsupported = [
-    ...new Set([...comps, ...(inventory.layouts ?? [])].map((c) => c.path).filter((p) => p && !SUPPORTED.test(p))),
+    ...new Set([
+      ...[...comps, ...(inventory.layouts ?? [])].map((c) => c.path).filter((p) => p && !SUPPORTED.test(p)),
+      ...found,
+    ]),
   ].sort();
   const items = tokens.map(({ name, axis }) => {
     const known = current.tokens.get(name);
@@ -520,7 +562,7 @@ const scalar = (e) => (typeof e === "string" ? e : e.value);
 const same = (a, b) => String(a ?? "").trim() === String(b ?? "").trim();
 const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
-export function resolvePick({ line, directions, current, inventory = null, reuse = null }) {
+export function resolvePick({ line, directions, current, inventory = null, reuse = null, unsupported = [] }) {
   const pick = parsePickLine(line);
   const byId = new Map(directions.directions.map((d) => [d.id, d]));
   for (const [axis, id] of Object.entries(pick))
@@ -558,7 +600,7 @@ export function resolvePick({ line, directions, current, inventory = null, reuse
     pick,
     tokenDiff: { added, removed: [], changed },
     contrastWarnings: contrastFor(current, palette).warnings,
-    impact: impactOf({ tokens: touched, current, inventory }),
+    impact: impactOf({ tokens: touched, current, inventory, unsupported }),
     wontCarry: wontCarryOf(reuse, [...new Set(touched.map((t) => t.axis))]),
   };
 }
@@ -1035,6 +1077,7 @@ export function renderDirections({
   current: cur,
   inventory = null,
   reuse = null,
+  unsupported = [],
   manifest = loadFontManifest(),
   projectFont = { intended: null },
   reactNative = false,
@@ -1099,7 +1142,7 @@ export function renderDirections({
   for (const a of MIX_AXES) {
     axes[a] = { current: { diff: [], impact: [], wont: [] } };
     for (const d of list) {
-      const p = resolvePick({ line: lineFor(a, d.id), directions, current: cur, inventory, reuse });
+      const p = resolvePick({ line: lineFor(a, d.id), directions, current: cur, inventory, reuse, unsupported });
       axes[a][d.id] = {
         diff: [
           ...p.tokenDiff.added.map((x) => ({ name: x.name, to: x.value })),
@@ -1199,7 +1242,7 @@ const stamp = (d) =>
     .replace(/[-:]/g, "")
     .replace(/\.\d+Z$/, "Z");
 
-function render({ project, directions, cur, manifest, inventory, reuse, ts }) {
+function render({ project, directions, cur, manifest, inventory, reuse, unsupported, ts }) {
   let pkg = {};
   try {
     pkg = JSON.parse(readFileSync(join(project, "package.json"), "utf8"));
@@ -1213,6 +1256,7 @@ function render({ project, directions, cur, manifest, inventory, reuse, ts }) {
     current: cur,
     inventory,
     reuse,
+    unsupported,
     manifest,
     projectFont: findProjectFont(project, md),
     reactNative: "react-native" in deps || "expo" in deps,
@@ -1248,14 +1292,15 @@ function main(argv) {
   const inventory = existsSync(invFile) ? readJson(invFile, "inventory") : null;
   const reuseFile = arg("--reuse");
   const reuse = reuseFile ? readJson(reuseFile, "reuse") : null;
+  const unsupported = unsupportedFilesOf(project);
   const line = arg("--resolve");
   if (line === undefined) {
     const ts = arg("--timestamp") ?? stamp(new Date());
     if (!TS_DIR.test(ts)) fail("usage", "--timestamp must be YYYYMMDDTHHMMSSZ");
-    console.log(render({ project, directions, cur, manifest, inventory, reuse, ts }));
+    console.log(render({ project, directions, cur, manifest, inventory, reuse, unsupported, ts }));
     return;
   }
-  const pick = resolvePick({ line, directions, current: cur, inventory, reuse });
+  const pick = resolvePick({ line, directions, current: cur, inventory, reuse, unsupported });
   const base = join(project, ".artist", "directions");
   // only render run dirs (UTC timestamps); any other directory is ignored
   const runs = existsSync(base)

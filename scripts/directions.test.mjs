@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import {
   SCHOOLS,
+  unsupportedFilesOf,
   validateDirections,
   checkCssValue,
   currentFrom,
@@ -467,6 +468,32 @@ test("an unsupported component format is reported unsupported, never zero", () =
   for (const i of imp.items) assert.equal(i.unsupported, true);
 });
 
+test("component files found in the project that inventory cannot parse are unsupported, never zero", () => {
+  const imp = impactOf({
+    tokens: changedAll,
+    current: cur,
+    inventory: json("inventory.json"),
+    unsupported: ["src/Card.svelte"],
+  });
+  assert.deepEqual(imp.unsupported, ["src/Card.svelte"]);
+  assert.match(imp.note, /unsupported component format \(src\/Card\.svelte\)/);
+  for (const i of imp.items) assert.equal(i.unsupported, true);
+});
+
+test("unsupportedFilesOf walks the project, skipping dependency and build dirs", () => {
+  const proj = mkProject({
+    files: {
+      "src/Card.svelte": "<div/>",
+      "src/pages/index.astro": "---",
+      "src/App.tsx": "x",
+      "node_modules/lib/A.svelte": "x",
+      "dist/B.svelte": "x",
+      ".artist/C.svelte": "x",
+    },
+  });
+  assert.deepEqual(unsupportedFilesOf(proj), ["src/Card.svelte", "src/pages/index.astro"]);
+});
+
 test("wontCarry: absent reuse.json is not checked and names design-system audit", () => {
   const dirs = validateDirections(valid(), cur);
   const p = resolvePick({ line: LINE, directions: dirs, current: cur, inventory: json("inventory.json") });
@@ -865,6 +892,25 @@ test("the project font must be a real woff/woff2 file inside the project; an out
   const fake = mkProject({ files: { "src/tokens.css": css, "assets/acme.woff2": "not a font" } });
   assert.equal(render(DJ, fake).status, 0);
   assert.doesNotMatch(page(fake), /fonts\/current/);
+});
+
+test("CLI: a Svelte component in the project marks impact unsupported on the page and in pick.json", () => {
+  const proj = mkProject({ inventory: true, files: { "src/Card.svelte": "<div/>" } });
+  assert.equal(render(DJ, proj).status, 0);
+  assert.match(page(proj), /unsupported component format \(src\/Card\.svelte\)/);
+  const r = spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--resolve",
+    LINE,
+    "--directions",
+    DJ,
+    "--project",
+    proj,
+  ]);
+  assert.equal(r.status, 0, r.stderr.toString());
+  const pick = JSON.parse(readFileSync(join(runDir(proj), "pick.json"), "utf8"));
+  assert.deepEqual(pick.impact.unsupported, ["src/Card.svelte"]);
+  assert.ok(pick.impact.items.every((i) => i.unsupported));
 });
 
 test("CLI --resolve ignores run directories that are not UTC timestamps", () => {
