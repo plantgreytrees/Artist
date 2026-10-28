@@ -36,7 +36,7 @@ The ten ids below are the only schools. `SCHOOLS` in `scripts/directions.mjs` mu
 
 - `current` names the present concept with `file:line` or DESIGN.md row evidence. It is a judgement, never a score, and carries no token values: Current's values are read from `docs/design/DESIGN.md` (format 2) by the script.
 - 3 to 5 directions, distinct schools, none equal to `current.school`, at least one ambitious school. Direction ids are lowercase (`a-z`, digits, `-`) and `current` is reserved.
-- Each axis maps a DESIGN.md token name (Semantic, Type scale, Spacing, Motion) or a Component token variable to a value, or a new name with `"proposed": true`. A colour token carries both `light` and `dark`. `base` holds only Spacing and Component tokens, never markup or layout.
+- Each axis maps a DESIGN.md token name (Semantic, Type scale, Spacing, Motion) or a Component token variable to a value, or a new name with `"proposed": true`. A colour token carries both `light` and `dark` and belongs on `palette` only (a colour on another axis exits 2, `colour-off-palette`). `base` holds only Spacing and Component tokens, never markup or layout.
 - Values must match the strict CSS grammar: hex, `rgb()`, `hsl()`, `oklch()`, linear and radial gradients of those, numbers with `px`, `rem`, `em`, `ms`, `%`, `cubic-bezier()`, and font family names. Anything else exits 2.
 
 ## Fonts
@@ -57,7 +57,7 @@ Run these steps in order, in this session. Do not dispatch an Agent or Task for 
    node "${CLAUDE_PLUGIN_ROOT}/scripts/directions.mjs" --directions <project>/.artist/directions.json --project <dir> [--reuse <reuse.json>]
    ```
    Add `--reuse` only with the `reuse.json` written by `design-system audit` (`reuse-check --all`). It prints the `directions.html` path inside `<project>/.artist/directions/<UTC ts>/`. Exit 2 is invalid input or a tool error: show stderr, fix `directions.json`, and render again. Contrast warnings never stop the run.
-7. Give the user the page path. Say that it works offline, has the final-result, specimen and pick & mix views, and shows contrast badges for any pair under 4.5:1. Ask them to copy the pick line from pick & mix and paste it back. Do not read any number off the page yourself.
+7. Give the user the page path. Say that it works offline, has the final-result, specimen and pick & mix views, and shows contrast badges for any pair under 4.5:1, plus a "not checked" badge for a pair whose value is a gradient or `var()`. Ask them to copy the pick line from pick & mix and paste it back. Do not read any number off the page yourself.
 
 ## Pick
 
