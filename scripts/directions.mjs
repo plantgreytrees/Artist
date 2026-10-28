@@ -53,18 +53,30 @@ const COLOUR_FN = /^(rgba?|hsla?|oklch)\(([^()]*)\)$/i;
 const COLOUR_ARG = /^-?(?:\d+\.?\d*|\.\d+)%?$/;
 const HUE_ARG = /^-?(?:\d+\.?\d*|\.\d+)(?:deg)?$/;
 const HUE_AT = { hsl: 0, hsla: 0, oklch: 2 };
-// Three numeric channels (comma- or space-separated), then an optional alpha; only the hue may carry `deg`.
-function isColourFn(t) {
+// The checked parts of a colour function, or null. One separator style per value: comma form takes 3 or 4
+// comma-separated parts and no `/`; space form takes 3 space-separated parts and an optional `/ alpha`.
+// Only the hue may carry `deg`.
+function colourFnParts(t) {
   const m = COLOUR_FN.exec(t);
-  if (!m) return false;
-  const [channels, alpha, extra] = m[2].split("/");
-  if (extra !== undefined) return false;
-  const parts = channels.trim().split(/\s*,\s*|\s+/);
-  if (alpha !== undefined ? parts.length !== 3 : parts.length !== 3 && parts.length !== 4) return false;
-  if (alpha !== undefined) parts.push(alpha.trim());
-  const hue = HUE_AT[m[1].toLowerCase()];
-  return parts.every((p, i) => (i === hue ? HUE_ARG : COLOUR_ARG).test(p));
+  if (!m) return null;
+  const body = m[2].trim();
+  let parts;
+  if (body.includes(",")) {
+    if (body.includes("/")) return null;
+    parts = body.split(/\s*,\s*/);
+    if (parts.length !== 3 && parts.length !== 4) return null;
+  } else {
+    const [channels, alpha, extra] = body.split("/");
+    if (extra !== undefined) return null;
+    parts = channels.trim().split(/\s+/);
+    if (parts.length !== 3) return null;
+    if (alpha !== undefined) parts.push(alpha.trim());
+  }
+  const fn = m[1].toLowerCase();
+  const hue = HUE_AT[fn];
+  return parts.every((p, i) => (i === hue ? HUE_ARG : COLOUR_ARG).test(p)) ? { fn, parts } : null;
 }
+const isColourFn = (t) => colourFnParts(t) !== null;
 const NUM = /^-?(?:\d+\.?\d*|\.\d+)$/;
 const LEN = /^-?(?:\d+\.?\d*|\.\d+)(?:px|rem|em|ms|%)$/;
 const ANGLE = /^-?(?:\d+\.?\d*|\.\d+)deg$/;
@@ -304,12 +316,11 @@ function toRgba(css) {
     if (h.length <= 4) h = [...h].map((x) => x + x).join("");
     return [0, 2, 4, 6].map((i) => (i < h.length ? parseInt(h.slice(i, i + 2), 16) / 255 : 1));
   }
-  const m = /^(rgba?|hsla?|oklch)\(([^)]*)\)$/i.exec(s);
-  if (!m) return null;
-  const parts = m[2].split(/[\s,/]+/).filter(Boolean);
+  // The same grammar as checkCssValue, so Current's DESIGN.md values are scored only in forms it accepts.
+  const checked = colourFnParts(s);
+  if (!checked) return null;
+  const { fn, parts } = checked;
   const num = (p, scale = 1) => (p.endsWith("%") ? (parseFloat(p) / 100) * scale : parseFloat(p));
-  const fn = m[1].toLowerCase();
-  if (parts.length < 3 || parts.slice(0, 4).some((p) => !Number.isFinite(parseFloat(p)))) return null;
   const alpha = parts.length > 3 ? clamp01(num(parts[3])) : 1;
   let rgb;
   if (fn.startsWith("rgb")) rgb = parts.slice(0, 3).map((p) => clamp01(num(p, 255) / 255));
@@ -514,7 +525,7 @@ export function unsupportedFilesOf(project, { limit = WALK_LIMIT } = {}) {
 // Which components reach each changed token. tokens: [{name, axis}] (names without the @dark suffix).
 // unsupported: the unsupportedFilesOf result, or a plain list of component paths in formats inventory cannot parse.
 export function impactOf({ tokens, current, inventory, unsupported: walk = [] }) {
-  const { files: found = [], truncated = false, limit } = Array.isArray(walk) ? { files: walk } : walk;
+  const { files: found = [], truncated = false, limit = WALK_LIMIT } = Array.isArray(walk) ? { files: walk } : walk;
   if (!inventory)
     return {
       status: "inventory-absent",
