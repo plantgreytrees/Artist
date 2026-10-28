@@ -491,7 +491,7 @@ test("unsupportedFilesOf walks the project, skipping dependency and build dirs",
       ".artist/C.svelte": "x",
     },
   });
-  assert.deepEqual(unsupportedFilesOf(proj), ["src/Card.svelte", "src/pages/index.astro"]);
+  assert.deepEqual(unsupportedFilesOf(proj).files, ["src/Card.svelte", "src/pages/index.astro"]);
 });
 
 test("wontCarry: absent reuse.json is not checked and names design-system audit", () => {

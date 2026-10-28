@@ -476,15 +476,23 @@ const SKIP_DIRS = new Set([
   ".nuxt",
   ".svelte-kit",
   "coverage",
+  "vendor",
+  "public",
+  "out",
+  ".venv",
+  ".turbo",
+  ".output",
+  ".vercel",
 ]);
 const WALK_LIMIT = 20000;
 
-// Sorted project-relative paths of component files in unsupported formats. Bounded; symlinks are not followed.
-export function unsupportedFilesOf(project) {
+// Sorted project-relative paths of component files in unsupported formats, and whether the walk stopped at
+// `limit` directory entries before finishing. Symlinks are not followed.
+export function unsupportedFilesOf(project, { limit = WALK_LIMIT } = {}) {
   const out = [];
   const stack = [""];
   let seen = 0;
-  while (stack.length && seen < WALK_LIMIT) {
+  while (stack.length && seen < limit) {
     const rel = stack.pop();
     let entries;
     try {
@@ -493,19 +501,20 @@ export function unsupportedFilesOf(project) {
       continue;
     }
     for (const e of entries) {
-      if (++seen > WALK_LIMIT) break;
+      if (++seen > limit) break;
       const p = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) {
         if (!SKIP_DIRS.has(e.name)) stack.push(p);
       } else if (e.isFile() && UNSUPPORTED_COMPONENT.test(e.name)) out.push(p);
     }
   }
-  return out.sort();
+  return { files: out.sort(), truncated: seen > limit || stack.length > 0, limit };
 }
 
 // Which components reach each changed token. tokens: [{name, axis}] (names without the @dark suffix).
-// unsupported: extra component paths in formats inventory cannot parse (see unsupportedFilesOf).
-export function impactOf({ tokens, current, inventory, unsupported: found = [] }) {
+// unsupported: the unsupportedFilesOf result, or a plain list of component paths in formats inventory cannot parse.
+export function impactOf({ tokens, current, inventory, unsupported: walk = [] }) {
+  const { files: found = [], truncated = false, limit } = Array.isArray(walk) ? { files: walk } : walk;
   if (!inventory)
     return {
       status: "inventory-absent",
@@ -536,12 +545,17 @@ export function impactOf({ tokens, current, inventory, unsupported: found = [] }
         })),
     };
     if (!known) item.proposed = true;
-    if (unsupported.length) item.unsupported = true;
+    if (unsupported.length || truncated) item.unsupported = true;
     return item;
   });
-  const note = unsupported.length
-    ? `unsupported component format (${unsupported.join(", ")}): impact for these files is not computed, not zero`
-    : "";
+  const note = [
+    unsupported.length &&
+      `unsupported component format (${unsupported.join(", ")}): impact for these files is not computed, not zero`,
+    truncated &&
+      `project walk stopped at ${limit} entries: files in unsupported formats beyond that are not counted, impact is not computed for them, not zero`,
+  ]
+    .filter(Boolean)
+    .join("; ");
   return { status: "computed", note, items, unsupported };
 }
 
