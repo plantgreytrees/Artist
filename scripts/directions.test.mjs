@@ -144,7 +144,7 @@ test("a proposed colour needs light and dark, a proposed name must be new", () =
   throwsNamed(() => validateDirections(v, cur), "proposed-exists");
 });
 
-// ---- CSS value grammar (ARCH-DIRECTIONS-07) ----
+// ---- CSS value grammar (ARCH-DIRECTIONS-15) ----
 
 for (const [file, bad] of [
   ["css-semicolon", "4px; color: red"],
