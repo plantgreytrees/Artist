@@ -1,106 +1,92 @@
 ---
 slug: scrutinise-design-directions
-goal: directions.html and pick.json report contrast truthfully for every colour a direction sets (shadcn names, alpha, gradients), and the sample screen shows shape, motion and spacing changes whatever the project's token names
+goal: directions.html and pick.json report contrast truthfully for every colour a direction sets (shadcn names, alpha, gradients, hsl/oklch units), accept only numeric colour arguments, and never show zero impact when the project walk could not finish
 level: feature
 parent: docs/plans/design-directions.md
 children: []
 priority: P1
-classification: in-scope (fixes to merged design-directions code; ARCH-DIRECTIONS-06/08 decided, docs/architecture/directions.rules.md)
-tracker_rows: [scrutinise-design-directions#scrutinise-directions-contrast, scrutinise-design-directions#scrutinise-directions-render] (scrutinise-directions-fixes CANCELLED: split per ARCH-ENGINE-08, 179 KB over the 122 KB unit budget)
+classification: in-scope (fixes to merged design-directions code; ARCH-DIRECTIONS-08/14/15 decided, docs/architecture/directions.rules.md)
+tracker_rows: [scrutinise-design-directions#scrutinise-directions-colour, scrutinise-design-directions#scrutinise-directions-walk] (round 1 rows contrast, render, unsupported COMPLETE; fixes CANCELLED)
 guards:
   blast_radius: done
   completeness_sweep: done
   blind_rederivation: skipped(findings come from an isolated scrutineer over a merged range; scope is the cited lines)
 coverage:
-  contract:      1.1, 1.3 (directions.json gains one rejection, colour-off-palette; pick.json schema 1 keeps its keys, contrastWarnings entries may carry ratio null with a not-computed note)
+  contract:      2.1 (directions.json grammar tightened: non-numeric colour arguments and non-deg hue units now exit 2), 2.5 (unsupportedFilesOf returns {files, truncated}; impact items may carry a truncated note)
   data:          N/A(no database)
   config:        N/A(no flags)
-  security:      1.6 (project font lookup resolves symlinks before containment)
-  tests:         1.1–1.6 (each fix ships a failing-first test in scripts/directions.test.mjs)
+  security:      2.1 (stricter grammar for untrusted token values)
+  tests:         2.1–2.5 (failing-first tests in new scripts/directions-colour.test.mjs and scripts/directions-walk.test.mjs so each unit fits execution.unitContextBytes, ARCH-ENGINE-08; directions.test.mjs is write-only, for the :147 comment and the :494 call shape)
   observability: N/A(offline CLI; exit codes 0/2)
-  interface:     1.3, 1.4 (contrast badges, all-pass note, sample screen aliases)
-  docs:          /sync-docs --all adds the palette-only colour line to skills/create/references/directions.md (governed by plugin.rules.md, kept out of unit scope for size); 1.7, 1.8 via /architect --update
+  interface:     2.5 (impact list shows a truncated note instead of zero)
+  docs:          2.6 via /sync-docs --all (skills/create/references/directions.md is governed by plugin.rules.md, outside unit scope)
   rollback:      revert the merge
 units:
   - id: 1
-    scope_id: scrutinise-directions-contrast
+    scope_id: scrutinise-directions-colour
     project: "."
     depends_on: []
-    module: scripts/directions.mjs (contrast)
+    module: scripts/directions.mjs (colour grammar, toRgba)
     language: javascript (node ESM)
     security: high
     scope:
-      read: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/DESIGN.md, scripts/fixtures/directions/directions.json, scripts/fixtures/directions/low-contrast.json, scripts/fixtures/directions/invalid/unknown-token.json]
+      read: [scripts/directions.mjs]
       docs: [docs/architecture/directions.rules.md, docs/architecture/verify.rules.md]
-      write: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/**]
-    arch: [ARCH-DIRECTIONS-05, ARCH-DIRECTIONS-08, ARCH-DIRECTIONS-13, ARCH-VERIFY-11, ARCH-VERIFY-18]
+      write: [scripts/directions.mjs, scripts/directions-colour.test.mjs, scripts/directions.test.mjs]
+    arch: [ARCH-DIRECTIONS-08, ARCH-DIRECTIONS-13, ARCH-DIRECTIONS-15, ARCH-VERIFY-11, ARCH-VERIFY-18]
     tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
   - id: 2
-    scope_id: scrutinise-directions-render
+    scope_id: scrutinise-directions-walk
     project: "."
-    depends_on: [scrutinise-directions-contrast]
-    module: scripts/directions.mjs (aliases, resolve, project font)
-    language: javascript (node ESM)
-    security: high
-    scope:
-      read: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/DESIGN.md, scripts/fixtures/directions/directions.json, scripts/fixtures/directions/project/**]
-      docs: [docs/architecture/directions.rules.md, docs/architecture/verify.rules.md]
-      write: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/**]
-    arch: [ARCH-DIRECTIONS-06, ARCH-DIRECTIONS-09, ARCH-DIRECTIONS-12, ARCH-DIRECTIONS-13, ARCH-VERIFY-11]
-    tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
-  - id: 3
-    scope_id: scrutinise-directions-unsupported
-    project: "."
-    depends_on: [scrutinise-directions-render]
-    module: scripts/directions.mjs (impact, unsupported formats)
+    depends_on: [scrutinise-directions-colour]
+    module: scripts/directions.mjs (project walk, impact)
     language: javascript (node ESM)
     security: normal
     scope:
-      read: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/inventory.json, scripts/fixtures/directions/inventory-unsupported.json, scripts/fixtures/directions/DESIGN.md]
+      read: [scripts/directions.mjs]
       docs: [docs/architecture/directions.rules.md, docs/architecture/verify.rules.md]
-      write: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/**]
-    arch: [ARCH-DIRECTIONS-11, ARCH-DIRECTIONS-13, ARCH-DIRECTIONS-14, ARCH-VERIFY-11, ARCH-VERIFY-23]
+      write: [scripts/directions.mjs, scripts/directions-walk.test.mjs, scripts/directions.test.mjs]
+    arch: [ARCH-DIRECTIONS-11, ARCH-DIRECTIONS-13, ARCH-DIRECTIONS-14, ARCH-VERIFY-11]
     tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
 ---
 
-# Plan: scrutinise design-directions — round 1 fixes
+# Plan: scrutinise design-directions — round 2 fixes
 
 ## Rolling summary
-Round 1 (`/scrutinise design-directions`, isolated scrutineer, range 391a9fd..eed45a8): 0 Critical, 5 Warning (4 Correctness, 1 Architecture), 6 Suggestion, 1 UNMET (design-directions acceptance: "a pair under 4.5:1 renders a visible badge … per direction and in the live mix", unticked). Disputed: none.
+- Round 1 (391a9fd..eed45a8): 0 Critical, 5 Warning, 6 Suggestion, 1 UNMET. Fixed by scrutinise-directions-contrast (55afd94), -render (064eab1) and -unsupported (a282119); rules synced by /architect --update (ced95ab: ARCH-DIRECTIONS-07 superseded by 15). Task detail is in git history.
+- Round 2 (eed45a8..0bb45b0, isolated scrutineer): 0 Critical, 4 Warning (3 Correctness, 1 Architecture), 7 Suggestion (2 Architecture), 0 UNMET. Findings 1, 2 and 4 reproduced by root against main. Disputed: none.
 
 ## Scope Steps (executable core)
 
-### Step 1 — scrutinise-directions-contrast (., javascript, high)
+### Step 1 — scrutinise-directions-colour (., javascript, high)
 Tooling: implementer · gates security-auditor · skills test-driven-development · guards secrets-scan
 Depends on: none
-- [x] 1.1 [Warning · Correctness · ARCH-DIRECTIONS-08] `scripts/directions.mjs:193-223` `checkEntry` accepts a colour (light/dark) token on `type`, `shape` or `motion`, but `contrastFor` (`:374-377`) reads only `palette`, so #eee text on #fff set on `shape` renders with no badge and no `contrastWarnings`. Reject a colour token on any axis but `palette` (exit 2, reason `colour-off-palette`) → accept: new invalid fixture exits 2 naming `colour-off-palette`; existing tests green
-- [x] 1.2 [Warning · Correctness · ARCH-DIRECTIONS-08] `:334-342` `ROLES`: in shadcn naming `muted` and `accent` are backgrounds (foregrounds are `muted-foreground`, `accent-foreground`), giving false 1.1:1 warnings on Current. Prefer `muted-foreground`/`accent-foreground`, prefer `primary` over bare `accent`, try bare `muted`/`accent` last; roles resolve in list order, not map order → accept: a shadcn-named fixture yields the reference ratios and no false warning
-- [x] 1.3 [Warning · Correctness · ARCH-DIRECTIONS-08, ARCH-VERIFY-18] `:271-327` and PAGE_JS (~`:872`): alpha colours are scored as opaque and gradient/`var()` pairs are skipped while the page still prints "All text pairs are at least 4.5:1". Composite an alpha foreground or surface over the resolved opaque background (page background for surface); a pair that cannot be computed is reported as not computed, naming the pair (pick.json: `ratio: null` with a `note`); the all-pass note shows only when every role pair was computed, per direction and in the mix → accept: tests for an rgba surface (composited ratio), a gradient background (not-computed entry, no all-pass note)
+- [ ] 2.1 [Warning · Architecture · ARCH-DIRECTIONS-15] `scripts/directions.mjs:52` `COLOUR_FN` (`[0-9a-z.,%\s/+-]*`) accepts letters, so `rgb(abc def ghi)`, `hsl(abc 50% 50%)` and `rgb(none 0 0)` pass `checkCssValue`, though rule 15 allows numeric arguments only. Restrict each argument to a number, a percentage or (hue only) a `deg` angle, with an optional `/ alpha`; reject other units (`turn`, `rad`, `grad`) → accept: those three values and `hsl(0.5turn 50% 50%)` exit 2 with reason `css-value`; existing grammar tests green
+- [ ] 2.2 [Warning · Correctness · ARCH-DIRECTIONS-08] `:302-308`, `:328` `toRgba` returns a colour for a NaN hsl hue (`contrast("#ffffff", "hsl(abc 50% 50%)")` = 10.41; null before eed45a8). Restore a per-part NaN guard so any unparsable part returns null → accept: test asserts `contrast("#ffffff", "hsl(abc 50% 50%)") === null`
+- [ ] 2.3 [Warning · Correctness · ARCH-DIRECTIONS-08] `:302-304`, `:314-315` units ignored: oklch `%` chroma is read raw (`oklch(50% 40% 120)` vs #000 = 15.30, correct ≈ 3.66) and hsl saturation/lightness are not clamped (`hsl(0 50% 150%)`). Map oklch `%` chroma as `p / 100 * 0.4`; clamp hsl s and l to 0..1 → accept: reference-value tests to 2 dp for an oklch `%` chroma and an over-100% hsl lightness (equal to `#ffffff`)
+- [ ] 2.4 [Suggestion · Architecture] `:1`, `:49` and `scripts/directions.test.mjs:147` comments cite ARCH-DIRECTIONS-07 (superseded) → point at ARCH-DIRECTIONS-15 → accept: `grep -n "ARCH-DIRECTIONS-07" scripts/directions.mjs scripts/directions.test.mjs` finds nothing
 
-### Step 2 — scrutinise-directions-render (., javascript, high)
-Tooling: implementer · gates security-auditor · skills test-driven-development · guards secrets-scan
-Depends on: scrutinise-directions-contrast
-- [x] 1.4 [Warning · Correctness · ARCH-DIRECTIONS-06] `:603-638` `aliasDecls` reads only `space.2`, `space.4`, `radius.md`, `body`, `heading`, `dur.fast`, `ease.out`, `shadow.md`, `blur`, so for other naming the sample screen shows no shape, motion or spacing change. Pick each alias from Current's tokens by category (DESIGN.md section and value kind via `currentFrom`), falling back to the fixed defaults → accept: render test with a DESIGN.md using different names shows a direction's radius, duration and spacing values reaching the sample-screen aliases
-- [x] 1.5 [Suggestion · Correctness · ARCH-DIRECTIONS-09] `:1146-1154` `--resolve` writes into the lexicographically last directory; consider only names matching `/^\d{8}T\d{6}Z$/` → accept: a stray `old/` directory is ignored
-- [x] 1.6 [Suggestion · Security · ARCH-DIRECTIONS-12] `:740`, `:747-749` `findProjectFont`: `realpathSync` root and candidate before the containment check, and require a regular file whose first bytes are a woff (`wOFF`) or woff2 (`wOF2`) signature → accept: a symlink pointing outside the project is not copied; existing font tests green
-
-### Step 3 — scrutinise-directions-unsupported (., javascript, normal) — added by /architect --update (ARCH-DIRECTIONS-14 VIOLATED; user: proceed with the recommended fix)
+### Step 2 — scrutinise-directions-walk (., javascript, normal)
 Tooling: implementer · skills test-driven-development · guards secrets-scan
-Depends on: scrutinise-directions-render
-- [x] 1.9 [Warning · Architecture · ARCH-DIRECTIONS-14] `inventory.mjs:419` keeps only tsx/jsx/ts/js/vue files, so `impactOf`'s unsupported branch (`directions.mjs:463-486`) never fires on real inventory output and a Svelte or Astro project gets "no component uses it" (zero). Scan the project itself (bounded walk, skipping `node_modules`, `.git`, `.artist`, `dist`, `build`) for component files in formats inventory does not support (`.svelte`, `.astro`, `.marko`, `.riot`) and pass them to `impactOf`, which marks impact unsupported; the render and `--resolve` CLI both pass them → accept: a project with `src/Card.svelte` and no inventory entry for it shows the unsupported note in the impact list and pick.json, never zero
+Depends on: scrutinise-directions-colour
+- [ ] 2.5 [Warning · Correctness · ARCH-DIRECTIONS-14] `:465`, `:472`, `:481` `unsupportedFilesOf` stops silently at `WALK_LIMIT` (20000) and returns what it found, so a large project can show zero impact. Return `{ files, truncated }` with an injectable limit (`unsupportedFilesOf(project, { limit })`); when truncated, `impactOf` marks each changed token's impact not computed with note `project walk stopped at <n> entries`; add `vendor`, `public`, `out`, `.venv`, `.turbo`, `.output`, `.vercel` to `SKIP_DIRS`; update the render and `--resolve` callers (`:1295`) and the existing test (`directions.test.mjs:494`) → accept: a test with a low injected limit shows the truncated note in the impact list and in pick.json, never zero; existing unsupported tests green
 
 ### Not a unit — routed to /sync-docs --all design-directions
-- [x] 1.7 [Warning · Architecture · ARCH-DIRECTIONS-10] `docs/architecture/directions.rules.md:20` check says design-system "init step 7"; the code, directions.md, eval grader and test use step 8, which is right (`skills/design-system/SKILL.md:34`). No code task: pre-approved doc-stale fix in `/sync-docs --all design-directions` via `/architect --update` → accept: rule text says step 8
-- [x] 1.8 [Suggestion · Architecture · ARCH-DIRECTIONS-07] the rule's grammar list omits `rgba`/`hsla`, `cubic-bezier()`, easing keywords, bare numbers and `deg` in gradients that the code accepts (all safe; directions.md documents cubic-bezier). Route to `/architect --update` in `/sync-docs`; if judged a decision change, ask the user → accept: rule and code agree
+- [ ] 2.6 [Suggestion · Architecture] `skills/create/references/directions.md:76` Apply step 1 does not describe `contrastWarnings` entries with `ratio: null` (`directions.mjs:435`). Say such an entry is a pair that was not checked and to show its `note` → accept: the reference pack says so
 
 ## Follow-ups (PENDING, not driven)
-- `none` / `transparent` keywords so no-shadow schools can write `shadow.md: none` (needs an ARCH-DIRECTIONS-07 amendment).
+- `NOT_COMPUTED` note chosen by cause: missing dark value, unparseable colour, or gradient/`var()` (`directions.mjs:388`, `:410-413`).
+- Static cards show a not-checked badge when `computed === 0`, and pick.json gains a computed count (`:1018-1020` vs `:1174`).
+- `slotToken` tie-break by code-unit order, not `localeCompare` (`:770`; determinism, ARCH-DIRECTIONS-06).
+- Font magic check reads only the first 4 bytes (`:895`).
+- PAGE_JS mix badge logic exercised in a `vm` test instead of a source-text match.
+- Carried from round 1: `none` / `transparent` keywords for no-shadow schools (needs an ARCH-DIRECTIONS-15 amendment).
 
 ## Verification background
-- Residual risk (scrutineer): `font-src 'self'` on file:// varies by browser; mix cascade and reduced-transparency untested in a real browser; `oklch()` percentage chroma and unit-less `hsl()` ratios unverified.
+- Residual risk (scrutineer): page not run in a browser (alias `var()` validity, mix badge logic); walk order and cost on large repos unmeasured; compositing checked only against WCAG reference ratios; theoretical TOCTOU between `realInside` and `copyFileSync` needs local write access.
 
 CONSUMERS:
-- directions.json (validation tightened) → scripts/directions.mjs `validateDirections`; produced in-session per skills/create/references/directions.md
-- contrastFor / contrastPairs / roleOf → scripts/directions.mjs:378, :506 (resolvePick), :613 (aliasDecls), :1007-1008 (render); scripts/directions.test.mjs:232, :241
-- pick.json `contrastWarnings` → skills/create/references/directions.md Apply step 1 (shown verbatim); not read by design-system
-- findProjectFont → scripts/directions.mjs:1104
+- `checkCssValue` / `COLOUR_FN` → scripts/directions.mjs:92 (`isColour`), validateDirections; directions.json authored per skills/create/references/directions.md (grammar line already lists only numeric forms)
+- `toRgba` / `contrast` → scripts/directions.mjs:347-348, :398 (contrastPairs); scripts/directions.test.mjs contrast tests
+- `unsupportedFilesOf` → scripts/directions.mjs:1295 (main, feeds render and --resolve); scripts/directions.test.mjs:20, :494
+- pick.json `impact` notes → skills/create/references/directions.md Apply step 1 (shown verbatim); not read by design-system
