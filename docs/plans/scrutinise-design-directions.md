@@ -48,6 +48,19 @@ units:
       write: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/**]
     arch: [ARCH-DIRECTIONS-06, ARCH-DIRECTIONS-09, ARCH-DIRECTIONS-12, ARCH-DIRECTIONS-13, ARCH-VERIFY-11]
     tooling: { implementer: implementer, gates: [security-auditor], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
+  - id: 3
+    scope_id: scrutinise-directions-unsupported
+    project: "."
+    depends_on: [scrutinise-directions-render]
+    module: scripts/directions.mjs (impact, unsupported formats)
+    language: javascript (node ESM)
+    security: normal
+    scope:
+      read: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/inventory.json, scripts/fixtures/directions/inventory-unsupported.json, scripts/fixtures/directions/DESIGN.md]
+      docs: [docs/architecture/directions.rules.md, docs/architecture/verify.rules.md]
+      write: [scripts/directions.mjs, scripts/directions.test.mjs, scripts/fixtures/directions/**]
+    arch: [ARCH-DIRECTIONS-11, ARCH-DIRECTIONS-13, ARCH-DIRECTIONS-14, ARCH-VERIFY-11, ARCH-VERIFY-23]
+    tooling: { implementer: implementer, gates: [], skills: [test-driven-development], guards: [secrets-scan], mcp: [] }
 ---
 
 # Plan: scrutinise design-directions — round 1 fixes
@@ -71,13 +84,17 @@ Depends on: scrutinise-directions-contrast
 - [ ] 1.5 [Suggestion · Correctness · ARCH-DIRECTIONS-09] `:1146-1154` `--resolve` writes into the lexicographically last directory; consider only names matching `/^\d{8}T\d{6}Z$/` → accept: a stray `old/` directory is ignored
 - [ ] 1.6 [Suggestion · Security · ARCH-DIRECTIONS-12] `:740`, `:747-749` `findProjectFont`: `realpathSync` root and candidate before the containment check, and require a regular file whose first bytes are a woff (`wOFF`) or woff2 (`wOF2`) signature → accept: a symlink pointing outside the project is not copied; existing font tests green
 
+### Step 3 — scrutinise-directions-unsupported (., javascript, normal) — added by /architect --update (ARCH-DIRECTIONS-14 VIOLATED; user: proceed with the recommended fix)
+Tooling: implementer · skills test-driven-development · guards secrets-scan
+Depends on: scrutinise-directions-render
+- [ ] 1.9 [Warning · Architecture · ARCH-DIRECTIONS-14] `inventory.mjs:419` keeps only tsx/jsx/ts/js/vue files, so `impactOf`'s unsupported branch (`directions.mjs:463-486`) never fires on real inventory output and a Svelte or Astro project gets "no component uses it" (zero). Scan the project itself (bounded walk, skipping `node_modules`, `.git`, `.artist`, `dist`, `build`) for component files in formats inventory does not support (`.svelte`, `.astro`, `.marko`, `.riot`) and pass them to `impactOf`, which marks impact unsupported; the render and `--resolve` CLI both pass them → accept: a project with `src/Card.svelte` and no inventory entry for it shows the unsupported note in the impact list and pick.json, never zero
+
 ### Not a unit — routed to /sync-docs --all design-directions
 - [ ] 1.7 [Warning · Architecture · ARCH-DIRECTIONS-10] `docs/architecture/directions.rules.md:20` check says design-system "init step 7"; the code, directions.md, eval grader and test use step 8, which is right (`skills/design-system/SKILL.md:34`). No code task: pre-approved doc-stale fix in `/sync-docs --all design-directions` via `/architect --update` → accept: rule text says step 8
 - [ ] 1.8 [Suggestion · Architecture · ARCH-DIRECTIONS-07] the rule's grammar list omits `rgba`/`hsla`, `cubic-bezier()`, easing keywords, bare numbers and `deg` in gradients that the code accepts (all safe; directions.md documents cubic-bezier). Route to `/architect --update` in `/sync-docs`; if judged a decision change, ask the user → accept: rule and code agree
 
 ## Follow-ups (PENDING, not driven)
 - `none` / `transparent` keywords so no-shadow schools can write `shadow.md: none` (needs an ARCH-DIRECTIONS-07 amendment).
-- Detect unsupported component formats from project files or Platform notes instead of inventory contents (`impactOf` `:397,409-411`; `inventory.mjs:419` never emits them, so the ARCH-DIRECTIONS-14 "unsupported, never zero" branch is unreachable for real output).
 
 ## Verification background
 - Residual risk (scrutineer): `font-src 'self'` on file:// varies by browser; mix cascade and reduced-transparency untested in a real browser; `oklch()` percentage chroma and unit-less `hsl()` ratios unverified.
