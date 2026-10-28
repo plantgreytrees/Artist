@@ -42,7 +42,8 @@ units:
 ## Rolling summary
 - Round 1 (391a9fd..eed45a8): 0 Critical, 5 Warning, 6 Suggestion, 1 UNMET → units contrast (55afd94), render (064eab1), unsupported (a282119); ARCH-DIRECTIONS-07 superseded by 15 (ced95ab).
 - Round 2 (eed45a8..0bb45b0): 0 Critical, 4 Warning, 7 Suggestion → units colour (1921b61), walk (8363101); docs 4e22aef.
-- Round 3 (0bb45b0..4e22aef, isolated scrutineer): 0 Critical, 1 Warning (Correctness), 6 Suggestion (1 Architecture), 0 UNMET. Findings 1 and 2 reproduced by root on main. Disputed: none. Earlier task detail is in git history.
+- Round 3 (0bb45b0..4e22aef, isolated scrutineer): 0 Critical, 1 Warning (Correctness), 6 Suggestion (1 Architecture), 0 UNMET. Findings 1 and 2 reproduced by root on main. Disputed: none. → unit parse (7a8daa3); docs 5f64a33.
+- Round 4 (4e22aef..5f64a33, isolated scrutineer): 0 Critical, 0 Warning, 0 Architecture, 0 UNMET; 6 Suggestion, recorded as follow-ups below. Review loop closed. Earlier task detail is in git history.
 
 ## Scope Steps (executable core)
 
@@ -58,6 +59,10 @@ Depends on: none
 - [x] 3.5 [Suggestion · Architecture · ARCH-DIRECTIONS-13] `docs/architecture/directions.rules.md:3` governs and rule 13 name only `scripts/directions.test.mjs`; add `scripts/directions-*.test.mjs` to governs and say `scripts/directions*.test.mjs` in rule 13 → accept: `arch-check governs scripts/directions-colour.test.mjs` lists directions.rules.md; lint PASS
 
 ## Follow-ups (PENDING, not driven)
+- Round 4: comma syntax for `oklch()` and mixed legacy forms (`rgb(0%, 0, 0)`, `hsl(0, 50, 50)`) are accepted and scored though browsers reject them (`directions.mjs:65-68`).
+- Round 4: a hue's `deg` is matched case-sensitively (`HUE_ARG`, `:53-54`), so `120DEG` from DESIGN.md is not computed.
+- Round 4: no end-to-end test from a DESIGN.md colour outside the grammar through `contrastPairs` to `ratio: null`.
+- Round 4: `impactOf` with `limit: null` would print "stopped at null" (use `limit ?? WALK_LIMIT`; unreachable today).
 - HTML mix impact panel shows `data.notes.impact` only when the list is empty, so the walk-stopped reason is not on the page (`directions.mjs:1042`; items still carry "[unsupported formats not counted]").
 - Walk reports truncated when only empty directories remain on the stack at the limit (safe direction).
 - `NOT_COMPUTED` note chosen by cause (missing dark value / unparseable / gradient or `var()`).
