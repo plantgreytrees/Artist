@@ -3,7 +3,7 @@
 > and `/architect --update directions` should be run.
 
 # Directions architecture
-_Last verified: 2026-10-28 at `a282119` · Source idea: [design-directions](../ideas/design-directions.md)_
+_Last verified: 2026-10-28 at `f2ff6fd` · Source idea: [design-directions](../ideas/design-directions.md)_
 
 ## In plain English
 `create --directions` adds one optional step before artist builds anything.
@@ -60,8 +60,8 @@ flowchart LR
 | ARCH-DIRECTIONS-11 | Impact from the inventory join; "won't carry" only from reuse.json | existing deterministic data; findings come only from reuse-check (ARCH-VERIFY-18) | the model listing affected files; grepping in the renderer |
 | ARCH-DIRECTIONS-12 | Bundled OFL woff2 fonts with a sha-pinned manifest | no network allowed; real typefaces make the type axis judgeable | a Google Fonts exception; system fallbacks only |
 | ARCH-DIRECTIONS-13 | node --test suite plus a create eval case | repo convention (ARCH-VERIFY-11, ARCH-PLUGIN-20) | manual checks |
-| ARCH-DIRECTIONS-14 | Starts after component_token_literals and skill-create-optimise (met); component formats inventory cannot parse (`.svelte`, `.astro`, `.marko`, `.riot`), found by a bounded project walk, show impact as unsupported, never zero | the "won't carry across" list depends on it, and they share SKILL.md files; inventory never lists those files, so only a walk can see them | starting in parallel (merge conflicts, an empty warning list); trusting inventory contents alone (the unsupported branch never fired) |
-| ARCH-DIRECTIONS-15 | Self-contained page, strict CSP, escaping, CSS value grammar that names every accepted form (rgba/hsla, `deg`, bare numbers, `cubic-bezier()`, easing keywords, `inset`) | token values are untrusted, and a style attribute is an injection sink; motion, type and shape tokens need these safe forms, and the rule must match the code | allowing arbitrary CSS strings; a page with no script (pick & mix needs JS); keeping the shorter 07 list (rule and code disagree) |
+| ARCH-DIRECTIONS-14 | Starts after component_token_literals and skill-create-optimise (met); component formats inventory cannot parse (`.svelte`, `.astro`, `.marko`, `.riot`), found by a bounded project walk, show impact as unsupported, never zero, including when the walk stops at its limit | the "won't carry across" list depends on it, and they share SKILL.md files; inventory never lists those files, so only a walk can see them | starting in parallel (merge conflicts, an empty warning list); trusting inventory contents alone (the unsupported branch never fired) |
+| ARCH-DIRECTIONS-15 | Self-contained page, strict CSP, escaping, CSS value grammar that names every accepted form (rgba/hsla, `deg`, bare numbers, `cubic-bezier()`, easing keywords, `inset`); colour functions take numeric arguments only | token values are untrusted, and a style attribute is an injection sink; motion, type and shape tokens need these safe forms, and the rule must match the code | allowing arbitrary CSS strings; a page with no script (pick & mix needs JS); keeping the shorter 07 list (rule and code disagree) |
 
 Inherited and unchanged: ARCH-PLUGIN-07/09/10/11 (skills, agent, critic),
 ARCH-PLUGIN-14/38 (only design-system writes DESIGN.md and token files, after
