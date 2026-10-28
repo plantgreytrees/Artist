@@ -1,7 +1,16 @@
 // Design directions (ARCH-DIRECTIONS-02..09, 11, 12, 14): schools, schema validation, the strict
 // CSS-value grammar, WCAG contrast, pick resolution and the offline directions.html renderer. Exported functions throw a DirectionsError
 // (exitCode 2, named reason); only the CLI maps it to stderr and the exit code.
-import { readFileSync, writeFileSync, readdirSync, existsSync, realpathSync, mkdirSync, copyFileSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  readdirSync,
+  existsSync,
+  realpathSync,
+  mkdirSync,
+  copyFileSync,
+  statSync,
+} from "node:fs";
 import { join, dirname, resolve, relative, basename, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatOf, tokensOf, componentTokensOf, bindTokens, categoryOf, tokenFilesOf } from "./design-md.mjs";
@@ -659,8 +668,9 @@ function aliasDecls(cur) {
     const v = n && cssVar(n, cur);
     return v ? `var(${v},${fallback[r]})` : fallback[r];
   };
-  const tok = (n, fb) => {
-    const v = cssVar(n, cur);
+  const tok = (slot, fb) => {
+    const n = slotToken(cur, slot);
+    const v = n && cssVar(n, cur);
     return v ? `var(${v},${fb})` : fb;
   };
   return [
@@ -670,16 +680,54 @@ function aliasDecls(cur) {
     ["muted", role("muted")],
     ["link", role("link")],
     ["accent", role("accent")],
-    ["sp2", tok("space.2", "8px")],
-    ["sp4", tok("space.4", "16px")],
-    ["radius", tok("radius.md", "8px")],
-    ["fs-body", tok("body", "1rem")],
-    ["fs-head", tok("heading", "1.5rem")],
-    ["dur", tok("dur.fast", "150ms")],
-    ["ease", tok("ease.out", "ease-out")],
-    ["shadow", tok("shadow.md", "none")],
-    ["blur", tok("blur", "0px")],
+    ["sp2", tok(SLOTS.sp2, "8px")],
+    ["sp4", tok(SLOTS.sp4, "16px")],
+    ["radius", tok(SLOTS.radius, "8px")],
+    ["fs-body", tok(SLOTS.body, "1rem")],
+    ["fs-head", tok(SLOTS.head, "1.5rem")],
+    ["dur", tok(SLOTS.dur, "150ms")],
+    ["ease", tok(SLOTS.ease, "ease-out")],
+    ["shadow", tok(SLOTS.shadow, "none")],
+    ["blur", tok(SLOTS.blur, "0px")],
   ].map(([k, v]) => `--s-${k}:${v}`);
+}
+
+// Sample-screen slots. Each takes its preferred name when DESIGN.md has it, else the Current token of a listed
+// kind whose name matches the first matching pattern, closest in value to `ideal` (px or ms), so a direction's
+// change to the project's own spacing, radius, type or motion tokens shows on the sample screen.
+const NOT_SPACE = /radius|round|corner|shadow|elev|blur|border/i;
+const SLOTS = {
+  sp2: { names: ["space.2"], kinds: ["spacing"], match: [/./], skip: NOT_SPACE, ideal: 8 },
+  sp4: { names: ["space.4"], kinds: ["spacing"], match: [/./], skip: NOT_SPACE, ideal: 16 },
+  radius: { names: ["radius.md"], kinds: ["spacing", "type", "motion"], match: [/radius|round|corner/i], ideal: 8 },
+  body: { names: ["body"], kinds: ["type"], match: [/body|base|text|default|\bp\b|md/i, /./], ideal: 16 },
+  head: { names: ["heading"], kinds: ["type"], match: [/head|title|display|h[1-3]|xl|lg/i, /./], ideal: 24 },
+  dur: { names: ["dur.fast"], kinds: ["motion"], match: [/./], value: /^[\d.]+m?s$/, ideal: 150 },
+  ease: { names: ["ease.out"], kinds: ["motion"], match: [/./], value: /^(?:cubic-bezier\(|ease|linear|steps\()/ },
+  shadow: { names: ["shadow.md"], kinds: ["spacing", "type", "motion"], match: [/shadow|elevation/i] },
+  blur: { names: ["blur"], kinds: ["spacing", "type", "motion"], match: [/blur/i] },
+};
+const magnitude = (v) => {
+  const m = /^(-?[\d.]+)(px|rem|em|ms|s)?$/.exec(String(v).trim());
+  if (!m) return Infinity;
+  const n = parseFloat(m[1]);
+  return m[2] === "rem" || m[2] === "em" ? n * 16 : m[2] === "s" ? n * 1000 : n;
+};
+function slotToken(cur, slot) {
+  for (const n of slot.names) if (cur.tokens.has(n)) return n;
+  const pool = [...cur.tokens.values()].filter(
+    (t) =>
+      slot.kinds.includes(t.kind) &&
+      !slot.skip?.test(t.name) &&
+      (!slot.value || slot.value.test(String(t.value).trim())),
+  );
+  for (const re of slot.match) {
+    const hits = pool.filter((t) => re.test(t.name));
+    if (!hits.length) continue;
+    const dist = (t) => (slot.ideal === undefined ? 0 : Math.abs(magnitude(t.value) - slot.ideal));
+    return hits.sort((a, b) => dist(a) - dist(b) || a.name.localeCompare(b.name))[0].name;
+  }
+  return null;
 }
 
 // ---- the fixed sample screen: sign-in form plus a small dashboard ----
@@ -778,22 +826,31 @@ function fontFaces(families, manifest) {
   return { copies, css };
 }
 
+// A regular file whose real path (symlinks resolved) lies inside root, else null.
+function realInside(root, path) {
+  if (!existsSync(path)) return null;
+  const real = realpathSync(path);
+  const rel = relative(root, real);
+  return rel.startsWith("..") || isAbsolute(rel) || !statSync(real).isFile() ? null : real;
+}
+const FONT_MAGIC = /^wOF[F2]/;
+const TS_DIR = /^\d{8}T\d{6}Z$/;
+
 // The project's own font: an @font-face in a Platform-notes token file whose font file exists inside the project.
 export function findProjectFont(project, md) {
   let intended = null;
-  const root = resolve(project);
+  const root = realpathSync(resolve(project));
   for (const declared of tokenFilesOf(md)) {
-    const file = resolve(root, declared);
-    if (relative(root, file).startsWith("..") || !/\.css$/i.test(file) || !existsSync(file)) continue;
+    const file = realInside(root, resolve(root, declared));
+    if (!file || !/\.css$/i.test(file)) continue;
     const text = readFileSync(file, "utf8");
     for (const m of text.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
       const fam = /font-family:\s*["']?([A-Za-z0-9 -]+)/.exec(m[1])?.[1]?.trim() ?? null;
       intended ??= fam;
       const url = /url\(\s*["']?([^"')]+\.woff2?)["']?\s*\)/i.exec(m[1])?.[1];
       if (!url) continue;
-      const abs = resolve(dirname(file), url);
-      const inside = relative(root, abs);
-      if (inside.startsWith("..") || isAbsolute(inside) || !existsSync(abs)) continue;
+      const abs = realInside(root, resolve(dirname(file), url));
+      if (!abs || !FONT_MAGIC.test(readFileSync(abs).subarray(0, 4).toString("latin1"))) continue;
       const name = basename(abs).replace(/[^A-Za-z0-9._-]/g, "_");
       return { abs, rel: `fonts/current/${name}`, format: /\.woff2$/i.test(abs) ? "woff2" : "woff", intended: fam };
     }
@@ -1194,15 +1251,16 @@ function main(argv) {
   const line = arg("--resolve");
   if (line === undefined) {
     const ts = arg("--timestamp") ?? stamp(new Date());
-    if (!/^\d{8}T\d{6}Z$/.test(ts)) fail("usage", "--timestamp must be YYYYMMDDTHHMMSSZ");
+    if (!TS_DIR.test(ts)) fail("usage", "--timestamp must be YYYYMMDDTHHMMSSZ");
     console.log(render({ project, directions, cur, manifest, inventory, reuse, ts }));
     return;
   }
   const pick = resolvePick({ line, directions, current: cur, inventory, reuse });
   const base = join(project, ".artist", "directions");
+  // only render run dirs (UTC timestamps); any other directory is ignored
   const runs = existsSync(base)
     ? readdirSync(base, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
+        .filter((e) => e.isDirectory() && TS_DIR.test(e.name))
         .map((e) => e.name)
         .sort()
     : [];

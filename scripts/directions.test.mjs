@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync } from "node:fs";
+import {
+  readFileSync,
+  readdirSync,
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+  symlinkSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -595,6 +604,41 @@ test("render writes only directions.html and fonts/ under the UTC-timestamped ru
   assert.deepEqual(readdirSync(proj).sort(), [".artist", "docs"]);
 });
 
+test("sample-screen aliases follow Current's own token names, so shape, motion and spacing changes show", () => {
+  const renamed = md
+    .replaceAll("space.2", "spacing.sm")
+    .replaceAll("space.4", "spacing.md")
+    .replaceAll("radius.md", "rounded.lg")
+    .replace("| body |", "| font.body |")
+    .replace("| heading |", "| font.title |")
+    .replaceAll("dur.fast", "duration.quick")
+    .replaceAll("ease.out", "easing.standard");
+  const proj = mkProject();
+  writeFileSync(join(proj, "docs", "design", "DESIGN.md"), renamed);
+  const d = valid();
+  for (const x of d.directions) for (const a of ["type", "shape", "motion", "base"]) x[a] = {};
+  Object.assign(d.directions[0], {
+    shape: { "rounded.lg": "0px" },
+    motion: { "duration.quick": "0ms" },
+    base: { "spacing.md": "24px" },
+  });
+  const r = render(tmpJson(d), proj);
+  assert.equal(r.status, 0, r.stderr.toString());
+  const html = page(proj);
+  for (const [slot, v] of [
+    ["sp2", "--spacing-sm,8px"],
+    ["sp4", "--spacing-md,16px"],
+    ["radius", "--rounded-lg,8px"],
+    ["fs-body", "--font-body,1rem"],
+    ["fs-head", "--font-title,1.5rem"],
+    ["dur", "--duration-quick,150ms"],
+    ["ease", "--easing-standard,ease-out"],
+  ])
+    assert.ok(html.includes(`--s-${slot}:var(${v})`), `--s-${slot} should read var(${v})`);
+  for (const decl of ["--rounded-lg:0px", "--duration-quick:0ms", "--spacing-md:24px"])
+    assert.ok(html.includes(decl), decl);
+});
+
 test("two runs with the same inputs are byte-identical", () => {
   const proj = mkProject();
   const snap = () => {
@@ -793,7 +837,7 @@ test("React Native projects are labelled as a web approximation", () => {
 
 test("the project's font loads by relative path when found via token files, else a labelled fallback", () => {
   const css = '@font-face { font-family: "Acme Sans"; src: url("../assets/acme.woff2") format("woff2"); }\n';
-  const has = mkProject({ files: { "src/tokens.css": css, "assets/acme.woff2": "WOFF2DATA" } });
+  const has = mkProject({ files: { "src/tokens.css": css, "assets/acme.woff2": "wOF2DATA" } });
   assert.equal(render(DJ, has).status, 0);
   assert.ok(existsSync(join(runDir(has), "fonts", "current", "acme.woff2")));
   assert.match(page(has), /url\(fonts\/current\/acme\.woff2\)/);
@@ -806,6 +850,39 @@ test("the project's font loads by relative path when found via token files, else
   });
   render(DJ, escape);
   assert.doesNotMatch(page(escape), /fonts\/current/);
+});
+
+test("the project font must be a real woff/woff2 file inside the project; an outward symlink is not copied", () => {
+  const css = '@font-face { font-family: "Acme Sans"; src: url("../assets/acme.woff2") format("woff2"); }\n';
+  const outside = join(mkdtempSync(join(tmpdir(), "dirx-")), "secret.woff2");
+  writeFileSync(outside, "wOF2 outside the project");
+  const link = mkProject({ files: { "src/tokens.css": css } });
+  mkdirSync(join(link, "assets"), { recursive: true });
+  symlinkSync(outside, join(link, "assets", "acme.woff2"));
+  assert.equal(render(DJ, link).status, 0);
+  assert.ok(!existsSync(join(runDir(link), "fonts", "current")));
+  assert.doesNotMatch(page(link), /fonts\/current/);
+  const fake = mkProject({ files: { "src/tokens.css": css, "assets/acme.woff2": "not a font" } });
+  assert.equal(render(DJ, fake).status, 0);
+  assert.doesNotMatch(page(fake), /fonts\/current/);
+});
+
+test("CLI --resolve ignores run directories that are not UTC timestamps", () => {
+  const proj = mkProject();
+  assert.equal(render(DJ, proj).status, 0);
+  mkdirSync(join(proj, ".artist", "directions", "old"));
+  const r = spawnSync(process.execPath, [
+    join(here, "directions.mjs"),
+    "--resolve",
+    LINE,
+    "--directions",
+    DJ,
+    "--project",
+    proj,
+  ]);
+  assert.equal(r.status, 0, r.stderr.toString());
+  assert.ok(existsSync(join(runDir(proj), "pick.json")));
+  assert.ok(!existsSync(join(proj, ".artist", "directions", "old", "pick.json")));
 });
 
 test("CLI --resolve after render writes pick.json into the render's run dir", () => {
