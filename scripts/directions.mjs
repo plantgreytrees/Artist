@@ -1,4 +1,4 @@
-// Design directions (ARCH-DIRECTIONS-02..09, 11, 12, 14): schools, schema validation, the strict
+// Design directions (ARCH-DIRECTIONS-02..06, 08, 09, 11, 12, 14, 15): schools, schema validation, the strict
 // CSS-value grammar, WCAG contrast, pick resolution and the offline directions.html renderer. Exported functions throw a DirectionsError
 // (exitCode 2, named reason); only the CLI maps it to stderr and the exit code.
 import {
@@ -46,10 +46,25 @@ export const SCHOOLS = Object.freeze(
 const SCHOOL = new Map(SCHOOLS.map((s) => [s.id, s]));
 const AXES = ["palette", "type", "shape", "motion", "base"];
 
-// ---- strict CSS-value grammar (ARCH-DIRECTIONS-07) ----
+// ---- strict CSS-value grammar (ARCH-DIRECTIONS-15) ----
 
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const COLOUR_FN = /^(?:rgba?|hsla?|oklch)\([0-9a-z.,%\s/+-]*\)$/i;
+const COLOUR_FN = /^(rgba?|hsla?|oklch)\(([^()]*)\)$/i;
+const COLOUR_ARG = /^-?(?:\d+\.?\d*|\.\d+)%?$/;
+const HUE_ARG = /^-?(?:\d+\.?\d*|\.\d+)(?:deg)?$/;
+const HUE_AT = { hsl: 0, hsla: 0, oklch: 2 };
+// Three numeric channels (comma- or space-separated), then an optional alpha; only the hue may carry `deg`.
+function isColourFn(t) {
+  const m = COLOUR_FN.exec(t);
+  if (!m) return false;
+  const [channels, alpha, extra] = m[2].split("/");
+  if (extra !== undefined) return false;
+  const parts = channels.trim().split(/\s*,\s*|\s+/);
+  if (alpha !== undefined ? parts.length !== 3 : parts.length !== 3 && parts.length !== 4) return false;
+  if (alpha !== undefined) parts.push(alpha.trim());
+  const hue = HUE_AT[m[1].toLowerCase()];
+  return parts.every((p, i) => (i === hue ? HUE_ARG : COLOUR_ARG).test(p));
+}
 const NUM = /^-?(?:\d+\.?\d*|\.\d+)$/;
 const LEN = /^-?(?:\d+\.?\d*|\.\d+)(?:px|rem|em|ms|%)$/;
 const ANGLE = /^-?(?:\d+\.?\d*|\.\d+)deg$/;
@@ -89,7 +104,7 @@ function splitTop(s, sep) {
   return out;
 }
 
-const isColour = (t) => HEX.test(t) || COLOUR_FN.test(t);
+const isColour = (t) => HEX.test(t) || isColourFn(t);
 
 function isGradient(t) {
   const m = /^(?:linear|radial)-gradient\(([\s\S]*)\)$/.exec(t);
@@ -294,14 +309,14 @@ function toRgba(css) {
   const parts = m[2].split(/[\s,/]+/).filter(Boolean);
   const num = (p, scale = 1) => (p.endsWith("%") ? (parseFloat(p) / 100) * scale : parseFloat(p));
   const fn = m[1].toLowerCase();
-  if (parts.length < 3) return null;
+  if (parts.length < 3 || parts.slice(0, 4).some((p) => !Number.isFinite(parseFloat(p)))) return null;
   const alpha = parts.length > 3 ? clamp01(num(parts[3])) : 1;
   let rgb;
   if (fn.startsWith("rgb")) rgb = parts.slice(0, 3).map((p) => clamp01(num(p, 255) / 255));
   else if (fn.startsWith("hsl")) {
     const h = (((parseFloat(parts[0]) % 360) + 360) % 360) / 360;
-    const sv = parseFloat(parts[1]) / 100;
-    const lv = parseFloat(parts[2]) / 100;
+    const sv = clamp01(parseFloat(parts[1]) / 100);
+    const lv = clamp01(parseFloat(parts[2]) / 100);
     const q = lv < 0.5 ? lv * (1 + sv) : lv + sv - lv * sv;
     const p = 2 * lv - q;
     const f = (t) => {
@@ -311,7 +326,7 @@ function toRgba(css) {
     rgb = [f(h + 1 / 3), f(h), f(h - 1 / 3)];
   } else {
     const L = num(parts[0]);
-    const C = parseFloat(parts[1]);
+    const C = num(parts[1], 0.4); // 100% chroma is 0.4 (CSS Color 4)
     const H = (parseFloat(parts[2]) * Math.PI) / 180;
     const a = C * Math.cos(H);
     const b = C * Math.sin(H);
